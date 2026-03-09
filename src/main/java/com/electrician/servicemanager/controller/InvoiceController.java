@@ -7,6 +7,8 @@ import com.electrician.servicemanager.repository.CustomerRepository;
 import com.electrician.servicemanager.repository.InvoiceItemRepository;
 import com.electrician.servicemanager.repository.InvoiceRepository;
 import com.electrician.servicemanager.service.InvoicePdfService;
+import com.electrician.servicemanager.entity.User;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -14,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -70,8 +73,8 @@ public class InvoiceController {
             Invoice invoice = new Invoice();
             invoice.setInvoiceNumber(generateInvoiceNumber());
             invoice.setCustomer(customer);
-            invoice.setInvoiceDate(LocalDate.now());
-            invoice.setDueDate(LocalDate.now().plusDays(7));
+            invoice.setInvoiceDate(LocalDate.now(ZoneId.of("Asia/Kolkata")));
+            invoice.setDueDate(LocalDate.now(ZoneId.of("Asia/Kolkata")).plusDays(7));
             invoice.setPaymentMethod(req.getPaymentMethod());
             invoice.setNotes(req.getNotes());
             invoice.setDiscountAmt(discount);
@@ -84,8 +87,8 @@ public class InvoiceController {
 
             String method = req.getPaymentMethod();
             invoice.setPaymentStatus(
-                    method != null && (method.equalsIgnoreCase("Cash") || method.equalsIgnoreCase("UPI"))
-                            ? "PAID" : "UNPAID"
+                method != null && (method.equalsIgnoreCase("Cash") || method.equalsIgnoreCase("UPI"))
+                    ? "PAID" : "UNPAID"
             );
 
             // ── STEP 3: Save invoice header (one save only) ───────────────
@@ -115,8 +118,16 @@ public class InvoiceController {
 
     // ── READ ──────────────────────────────────────────────────────────────────
     @GetMapping
-    public ResponseEntity<List<Invoice>> getAll() {
-        return ResponseEntity.ok(invoiceRepository.findAll());
+    public ResponseEntity<List<Invoice>> getAll(HttpServletRequest req) {
+        User owner = (User) req.getAttribute("currentUser");
+        List<Invoice> all = invoiceRepository.findAll();
+        if (owner == null) return ResponseEntity.ok(all);
+        // Filter: only invoices for this owner's customers
+        return ResponseEntity.ok(all.stream()
+            .filter(i -> i.getCustomer() == null ||
+                         i.getCustomer().getOwner() == null ||
+                         owner.getId().equals(i.getCustomer().getOwner().getId()))
+            .collect(java.util.stream.Collectors.toList()));
     }
 
     @GetMapping("/{id}")
@@ -138,6 +149,31 @@ public class InvoiceController {
         return invoiceRepository.findById(id).map(inv -> {
             inv.setPaymentStatus("PAID");
             inv.setPaymentMethod(method);
+            return ResponseEntity.ok(invoiceRepository.save(inv));
+        }).orElse(ResponseEntity.notFound().build());
+    }
+
+    // ── EDIT INVOICE ─────────────────────────────────────────────────────────
+    // AllInvoices.jsx uses PUT /invoices/{id} to update payment status, method, discount, tech name
+    @PutMapping("/{id}")
+    public ResponseEntity<?> updateInvoice(@PathVariable Long id,
+                                           @RequestBody UpdateInvoiceRequest req) {
+        return invoiceRepository.findById(id).map(inv -> {
+            if (req.getPaymentStatus()  != null) inv.setPaymentStatus(req.getPaymentStatus());
+            if (req.getPaymentMethod()  != null) inv.setPaymentMethod(req.getPaymentMethod());
+            if (req.getTechnicianName() != null) inv.setTechnicianName(req.getTechnicianName());
+            if (req.getNotes()          != null) inv.setNotes(req.getNotes());
+            if (req.getDiscountAmt()    != null) {
+                // Recalculate totals when discount changes
+                double subtotal = inv.getSubtotal() != null ? inv.getSubtotal() : 0;
+                double taxPct   = inv.getTaxPercent() != null ? inv.getTaxPercent() : 0;
+                double discount = req.getDiscountAmt();
+                double taxAmt   = (subtotal - discount) * taxPct / 100.0;
+                double total    = subtotal - discount + taxAmt;
+                inv.setDiscountAmt(discount);
+                inv.setTaxAmount(taxAmt);
+                inv.setTotalAmount(total);
+            }
             return ResponseEntity.ok(invoiceRepository.save(inv));
         }).orElse(ResponseEntity.notFound().build());
     }
@@ -165,8 +201,15 @@ public class InvoiceController {
 
     // ── HELPERS ───────────────────────────────────────────────────────────────
     private synchronized String generateInvoiceNumber() {
+        // Use timestamp suffix to prevent race condition on concurrent saves
         long count = invoiceRepository.count() + 1;
-        return "INV-" + String.format("%04d", count) + "-" + LocalDate.now().getYear();
+        String base = "INV-" + String.format("%04d", count) + "-" + LocalDate.now(ZoneId.of("Asia/Kolkata")).getYear();
+        // Check for collision and increment if needed
+        while (invoiceRepository.findByInvoiceNumber(base).isPresent()) {
+            count++;
+            base = "INV-" + String.format("%04d", count) + "-" + LocalDate.now(ZoneId.of("Asia/Kolkata")).getYear();
+        }
+        return base;
     }
     private double nvl(Double d) { return d != null ? d : 0.0; }
 
@@ -209,5 +252,25 @@ public class InvoiceController {
         public void    setQuantity(Integer v)   { quantity = v; }
         public Double  getUnitPrice()           { return unitPrice; }
         public void    setUnitPrice(Double v)   { unitPrice = v; }
+    }
+
+    // ── UpdateInvoiceRequest DTO ──────────────────────────────────────────────
+    public static class UpdateInvoiceRequest {
+        private String paymentStatus;
+        private String paymentMethod;
+        private Double discountAmt;
+        private String technicianName;
+        private String notes;
+
+        public String getPaymentStatus()           { return paymentStatus; }
+        public void   setPaymentStatus(String v)   { paymentStatus = v; }
+        public String getPaymentMethod()           { return paymentMethod; }
+        public void   setPaymentMethod(String v)   { paymentMethod = v; }
+        public Double getDiscountAmt()             { return discountAmt; }
+        public void   setDiscountAmt(Double v)     { discountAmt = v; }
+        public String getTechnicianName()          { return technicianName; }
+        public void   setTechnicianName(String v)  { technicianName = v; }
+        public String getNotes()                   { return notes; }
+        public void   setNotes(String v)           { notes = v; }
     }
 }

@@ -1,5 +1,6 @@
 package com.electrician.servicemanager.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -53,4 +54,10 @@ public class Customer {
 
     @Column(length = 500)
     private String notes;            // Extra remarks
+
+    // ── Owner link (multi-tenant support) ─────────────
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "owner_id")
+    @JsonIgnoreProperties({"hibernateLazyInitializer","handler","password","owner"})
+    private com.electrician.servicemanager.entity.User owner;
 }

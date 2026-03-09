@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -65,8 +66,12 @@ public class JobController {
         job.setMachineBrand(req2.getMachineBrand());
         job.setPriority(req2.getPriority() != null ? req2.getPriority() : "NORMAL");
         job.setNotes(req2.getNotes());
-        job.setScheduledDate(req2.getScheduledDate() != null ? LocalDate.parse(req2.getScheduledDate()) : LocalDate.now());
+        job.setScheduledDate(req2.getScheduledDate() != null ? LocalDate.parse(req2.getScheduledDate()) : LocalDate.now(ZoneId.of("Asia/Kolkata")));
+        job.setScheduledTime(req2.getScheduledTime());
         job.setCreatedAt(LocalDateTime.now());
+        // Save job location for route drawing in Live Tracking
+        if (req2.getLatitude() != null)  job.setLatitude(req2.getLatitude());
+        if (req2.getLongitude() != null) job.setLongitude(req2.getLongitude());
 
         // ── Customer: existing ya naya auto-create ──
         if (req2.getCustomerId() != null) {
@@ -83,8 +88,9 @@ public class JobController {
             c.setMachineType(req2.getMachineType());
             c.setMachineBrand(req2.getMachineBrand() != null ? req2.getMachineBrand() : "");
             c.setServiceStatus("PENDING");
-            c.setWarrantyPeriod("1 year");
+            c.setWarrantyPeriod("No Warranty");   // fixed: don't assume 1 year
             c.setServiceDate(job.getScheduledDate());
+            c.setOwner(owner);    // Link customer to this owner
             Customer saved = customerRepository.save(c);
             job.setCustomer(saved);
         }
@@ -120,16 +126,62 @@ public class JobController {
         return jobRepository.findById(id).map(job -> {
             if (req2.getStatus() != null) {
                 job.setStatus(req2.getStatus());
-                if ("DONE".equals(req2.getStatus())) job.setCompletedAt(LocalDateTime.now());
+                if ("DONE".equals(req2.getStatus()))        job.setCompletedAt(LocalDateTime.now());
+                if ("IN_PROGRESS".equals(req2.getStatus()) && job.getStartedAt() == null)
+                    job.setStartedAt(LocalDateTime.now());
+                if ("ON_THE_WAY".equals(req2.getStatus()) && job.getArrivedAt() == null)
+                    job.setArrivedAt(LocalDateTime.now());
+
+                // ── Sync customer serviceStatus ──────────────────────────────
+                Customer cust = job.getCustomer();
+                if (cust != null) {
+                    if ("CANCELLED".equals(req2.getStatus())) {
+                        cust.setServiceStatus("CANCELLED");
+                        customerRepository.save(cust);
+                    } else if ("DONE".equals(req2.getStatus())) {
+                        cust.setServiceStatus("DONE");
+                        customerRepository.save(cust);
+                    }
+                }
             }
+            // Explicit timestamp overrides from TechApp
+            if (req2.getArrivedAt() != null)  job.setArrivedAt(LocalDateTime.parse(req2.getArrivedAt()));
+            if (req2.getStartedAt() != null)  job.setStartedAt(LocalDateTime.parse(req2.getStartedAt()));
             if (req2.getTechnicianId() != null) {
                 userRepository.findById(req2.getTechnicianId()).ifPresent(tech -> {
                     job.setTechnician(tech);
                     job.setStatus("ASSIGNED");
                 });
             }
+            if (req2.getScheduledTime() != null) job.setScheduledTime(req2.getScheduledTime());
             if (req2.getNotes() != null) job.setNotes(req2.getNotes());
-            return ResponseEntity.ok(jobRepository.save(job));
+            if (req2.getLatitude()  != null) job.setLatitude(req2.getLatitude());
+            if (req2.getLongitude() != null) job.setLongitude(req2.getLongitude());
+            Job saved = jobRepository.save(job);
+
+            // If technician just assigned → build auto-WA URL for customer
+            if (req2.getTechnicianId() != null && saved.getTechnician() != null) {
+                String custMobile = saved.getDisplayMobile();
+                String techName   = saved.getTechnician().getName();
+                String techMobile = saved.getTechnician().getMobile();
+                String date  = saved.getScheduledDate() != null ? saved.getScheduledDate().toString() : "-";
+                String time  = saved.getScheduledTime() != null ? saved.getScheduledTime() : "";
+                String when  = time.isBlank() ? date : date + " " + time;
+                String waMsg = "🙏 Namaste " + nvl(saved.getDisplayName()) + " ji!\n\n"
+                    + "Aapka service request confirm ho gaya hai. ✅\n\n"
+                    + "👷 Technician: *" + techName + "*\n"
+                    + "📞 Tech Mobile: " + techMobile + "\n"
+                    + "📅 Schedule: *" + when + "*\n"
+                    + "🔧 Machine: " + nvl(saved.getMachineType())
+                    + (saved.getMachineBrand()!=null ? " - "+saved.getMachineBrand() : "") + "\n\n"
+                    + "Koi problem ho toh humse directly contact karein.\n"
+                    + "Dhanyawad! 🙏";
+                String waUrl = custMobile != null && !custMobile.isBlank()
+                    ? "https://wa.me/91" + custMobile + "?text=" + java.net.URLEncoder.encode(waMsg, java.nio.charset.StandardCharsets.UTF_8)
+                    : null;
+                return ResponseEntity.ok(Map.of("job", saved, "whatsappUrl", waUrl != null ? waUrl : ""));
+            }
+            return ResponseEntity.ok(saved);
         }).orElse(ResponseEntity.notFound().build());
     }
 
@@ -171,7 +223,7 @@ public class JobController {
                 if (cr.getWarrantyPeriod() != null) customer.setWarrantyPeriod(cr.getWarrantyPeriod());
 
                 LocalDate sDate = cr.getServiceDate() != null
-                        ? LocalDate.parse(cr.getServiceDate()) : LocalDate.now();
+                        ? LocalDate.parse(cr.getServiceDate()) : LocalDate.now(ZoneId.of("Asia/Kolkata"));
                 customer.setServiceDate(sDate);
 
                 String wp   = cr.getWarrantyPeriod() != null ? cr.getWarrantyPeriod() : "1 year";
@@ -245,8 +297,9 @@ public class JobController {
         private String customerName, customerMobile, customerAddress;
         private Double latitude, longitude;
         private String problemDescription, machineType, machineBrand;
-        private String priority, status, scheduledDate, notes;
+        private String priority, status, scheduledDate, scheduledTime, notes;
         private Long   technicianId;
+        private String arrivedAt, startedAt;   // ISO datetime strings from TechApp
 
         public Long   getCustomerId()              { return customerId; }
         public void   setCustomerId(Long v)        { customerId = v; }
@@ -274,8 +327,14 @@ public class JobController {
         public void   setStatus(String v)          { status = v; }
         public String getScheduledDate()           { return scheduledDate; }
         public void   setScheduledDate(String v)   { scheduledDate = v; }
+        public String getScheduledTime()           { return scheduledTime; }
+        public void   setScheduledTime(String v)   { scheduledTime = v; }
         public String getNotes()                   { return notes; }
         public void   setNotes(String v)           { notes = v; }
+        public String getArrivedAt()               { return arrivedAt; }
+        public void   setArrivedAt(String v)       { arrivedAt = v; }
+        public String getStartedAt()               { return startedAt; }
+        public void   setStartedAt(String v)       { startedAt = v; }
     }
 
     public static class CompleteRequest {

@@ -53,11 +53,18 @@ public class Job {
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "owner", "password"})
     private User owner;
 
-    private LocalDate scheduledDate;
+    private LocalDate     scheduledDate;
+    private String        scheduledTime;      // "10:30 AM" format
     private LocalDateTime createdAt = LocalDateTime.now();
-    private LocalDateTime completedAt;
+    private LocalDateTime arrivedAt;          // Tech ne ghar pahuncha
+    private LocalDateTime startedAt;          // Kaam shuru kiya
+    private LocalDateTime completedAt;        // Kaam khatam
 
     private String notes;
+
+    // Job location (customer ke ghar ki lat/lng) — route drawing ke liye
+    private Double latitude;
+    private Double longitude;
 
     // Helper: customer ka naam kaunsa show kare
     public String getDisplayName() {

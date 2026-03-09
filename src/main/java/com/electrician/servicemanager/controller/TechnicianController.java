@@ -2,6 +2,7 @@ package com.electrician.servicemanager.controller;
 
 import com.electrician.servicemanager.entity.User;
 import com.electrician.servicemanager.repository.UserRepository;
+import com.electrician.servicemanager.repository.JobRepository;
 import com.electrician.servicemanager.security.JwtUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
@@ -18,11 +19,14 @@ public class TechnicianController {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JobRepository jobRepository;
 
     public TechnicianController(UserRepository userRepository,
-                                PasswordEncoder passwordEncoder) {
-        this.userRepository = userRepository;
+                                PasswordEncoder passwordEncoder,
+                                JobRepository jobRepository) {
+        this.userRepository  = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.jobRepository   = jobRepository;
     }
 
     // ── Owner ke saare technicians ────────────────────────────────────────────
@@ -108,8 +112,17 @@ public class TechnicianController {
                 return ResponseEntity.status(403)
                         .body(Map.of("error", "Tumhara technician nahi hai"));
             }
+            // Check for active/assigned jobs before deleting
+            long activeJobs = jobRepository.findByTechnicianId(tech.getId()).stream()
+                .filter(j -> !List.of("DONE","CANCELLED").contains(j.getStatus()))
+                .count();
+            if (activeJobs > 0) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "error", tech.getName() + " ke paas " + activeJobs + " active job(s) hain — pehle complete/cancel karo"
+                ));
+            }
             userRepository.deleteById(id);
-            return ResponseEntity.ok(Map.of("message", "Delete ho gaya"));
+            return ResponseEntity.ok(Map.of("message", tech.getName() + " delete ho gaya"));
         }).orElse(ResponseEntity.notFound().build());
     }
 

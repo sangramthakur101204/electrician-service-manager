@@ -32,4 +32,12 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
 
     // Status filter
     List<Customer> findByServiceStatus(String serviceStatus);
+
+    // Owner filter (returns owner's customers + legacy records with no owner)
+    @Query("SELECT c FROM Customer c WHERE c.owner.id = :ownerId OR c.owner IS NULL")
+    List<Customer> findByOwnerIdOrOwnerIsNull(@Param("ownerId") Long ownerId);
+
+    // Owner + status
+    @Query("SELECT c FROM Customer c WHERE (c.owner.id = :ownerId OR c.owner IS NULL) AND c.serviceStatus = :status")
+    List<Customer> findByOwnerIdOrOwnerIsNullAndStatus(@Param("ownerId") Long ownerId, @Param("status") String status);
 }

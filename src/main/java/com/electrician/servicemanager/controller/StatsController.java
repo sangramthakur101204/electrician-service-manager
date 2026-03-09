@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -35,12 +36,18 @@ public class StatsController {
         User owner   = (User) req.getAttribute("currentUser");
         Long ownerId = owner.getId();
 
-        LocalDate today      = LocalDate.now();
+        LocalDate today      = LocalDate.now(ZoneId.of("Asia/Kolkata"));
         LocalDate yesterday  = today.minusDays(1);
         LocalDate dayBefore  = today.minusDays(2);
         LocalDate monthStart = today.withDayOfMonth(1);
 
-        List<Invoice> allInvoices = invoiceRepository.findAll();
+        List<Invoice> allInvoicesFull = invoiceRepository.findAll();
+        // Filter to this owner's invoices only (via customer.owner link)
+        List<Invoice> allInvoices = allInvoicesFull.stream()
+            .filter(i -> i.getCustomer() == null ||
+                         i.getCustomer().getOwner() == null ||
+                         ownerId.equals(i.getCustomer().getOwner().getId()))
+            .collect(Collectors.toList());
         List<Job>     allJobs     = jobRepository.findByOwnerId(ownerId);
 
         // ── Revenue by day helper ──────────────────────────────────────────

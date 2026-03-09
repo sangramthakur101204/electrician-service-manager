@@ -1,13 +1,19 @@
 package com.electrician.servicemanager.controller;
 
 import com.electrician.servicemanager.entity.Customer;
+import com.electrician.servicemanager.entity.User;
 import com.electrician.servicemanager.repository.CustomerRepository;
+import com.electrician.servicemanager.repository.JobRepository;
+import com.electrician.servicemanager.repository.InvoiceRepository;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
@@ -17,25 +23,35 @@ import java.util.List;
 public class CustomerController {
 
     private final CustomerRepository customerRepository;
+    private final JobRepository       jobRepository;
+    private final InvoiceRepository   invoiceRepository;
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("dd MMM yyyy");
 
-    public CustomerController(CustomerRepository customerRepository) {
+    public CustomerController(CustomerRepository customerRepository,
+                               JobRepository jobRepository,
+                               InvoiceRepository invoiceRepository) {
         this.customerRepository = customerRepository;
+        this.jobRepository      = jobRepository;
+        this.invoiceRepository  = invoiceRepository;
     }
 
     // ── CRUD ──────────────────────────────────────────────
 
     @PostMapping
-    public ResponseEntity<Customer> addCustomer(@RequestBody Customer customer) {
+    public ResponseEntity<Customer> addCustomer(@RequestBody Customer customer,
+                                                HttpServletRequest req) {
+        User owner = (User) req.getAttribute("currentUser");
+        if (owner != null) customer.setOwner(owner);
         if (customer.getServiceStatus() == null) customer.setServiceStatus("PENDING");
-        // Auto-calculate warranty end date
         customer.setWarrantyEnd(calcWarrantyEnd(customer.getServiceDate(), customer.getWarrantyPeriod()));
         return ResponseEntity.ok(customerRepository.save(customer));
     }
 
     @GetMapping
-    public ResponseEntity<List<Customer>> getAllCustomers() {
-        return ResponseEntity.ok(customerRepository.findAll());
+    public ResponseEntity<List<Customer>> getAllCustomers(HttpServletRequest req) {
+        User owner = (User) req.getAttribute("currentUser");
+        if (owner == null) return ResponseEntity.ok(customerRepository.findAll());
+        return ResponseEntity.ok(customerRepository.findByOwnerIdOrOwnerIsNull(owner.getId()));
     }
 
     @GetMapping("/{id}")
@@ -68,8 +84,18 @@ public class CustomerController {
     }
 
     @DeleteMapping("/{id}")
+    @Transactional
     public ResponseEntity<Void> deleteCustomer(@PathVariable Long id) {
         if (!customerRepository.existsById(id)) return ResponseEntity.notFound().build();
+
+        // Nullify customer FK in jobs (orphan jobs stay, not deleted)
+        jobRepository.findByCustomerId(id)
+            .forEach(j -> { j.setCustomer(null); jobRepository.save(j); });
+
+        // Delete all invoices for this customer
+        invoiceRepository.findByCustomerId(id)
+            .forEach(invoiceRepository::delete);
+
         customerRepository.deleteById(id);
         return ResponseEntity.noContent().build();
     }
@@ -126,7 +152,7 @@ public class CustomerController {
     @GetMapping("/whatsapp/warranty/{id}")
     public ResponseEntity<String> warrantyCardMessage(@PathVariable Long id) {
         return customerRepository.findById(id).map(c -> {
-            String certNo = "WC-" + String.format("%04d", c.getId()) + "-" + LocalDate.now().getYear();
+            String certNo = "WC-" + String.format("%04d", c.getId()) + "-" + LocalDate.now(ZoneId.of("Asia/Kolkata")).getYear();
             String msg = "🛡️ *WARRANTY CERTIFICATE*\n"
                     + "━━━━━━━━━━━━━━━━━━━━━━\n"
                     + "*ElectroServe* — Professional Electrician Services ⚡\n\n"
@@ -182,15 +208,19 @@ public class CustomerController {
     // ── SEARCH & FILTERS ──────────────────────────────────
 
     @GetMapping("/warranty-expiring")
-    public ResponseEntity<List<Customer>> expiringSoon() {
-        LocalDate today = LocalDate.now();
+    public ResponseEntity<List<Customer>> expiringSoon(HttpServletRequest req) {
+        User owner = (User) req.getAttribute("currentUser");
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Kolkata"));
         LocalDate next30 = today.plusDays(30);
+        List<Customer> all = owner != null
+            ? customerRepository.findByOwnerIdOrOwnerIsNull(owner.getId())
+            : customerRepository.findAll();
         return ResponseEntity.ok(
-                customerRepository.findAll().stream()
-                        .filter(c -> c.getWarrantyEnd() != null
-                                && !c.getWarrantyEnd().isBefore(today)
-                                && !c.getWarrantyEnd().isAfter(next30))
-                        .toList()
+            all.stream()
+               .filter(c -> c.getWarrantyEnd() != null
+                         && !c.getWarrantyEnd().isBefore(today)
+                         && !c.getWarrantyEnd().isAfter(next30))
+               .toList()
         );
     }
 

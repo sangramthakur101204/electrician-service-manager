@@ -24,6 +24,10 @@ public interface JobRepository extends JpaRepository<Job, Long> {
     @Query("SELECT j FROM Job j WHERE j.technician.id = :techId AND j.status NOT IN ('DONE','CANCELLED') ORDER BY j.createdAt DESC")
     List<Job> findActivByTechnicianId(@Param("techId") Long techId);
 
+    // Customer ke saare jobs
+    @Query("SELECT j FROM Job j WHERE j.customer.id = :customerId")
+    List<Job> findByCustomerId(@Param("customerId") Long customerId);
+
     // Owner ke active jobs count
     @Query("SELECT COUNT(j) FROM Job j WHERE j.owner.id = :ownerId AND j.status NOT IN ('DONE','CANCELLED')")
     long countActiveByOwnerId(@Param("ownerId") Long ownerId);

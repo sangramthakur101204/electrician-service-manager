@@ -6,6 +6,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -34,7 +35,7 @@ public class ReminderService {
     }
 
     public void runCheck() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Kolkata"));
         LocalDate in30  = today.plusDays(30);
         lastChecked = today;
         pendingReminders = customerRepository.findAll().stream()
@@ -48,12 +49,12 @@ public class ReminderService {
 
     public List<Customer> getPendingReminders() {
         // Refresh if not checked today
-        if (lastChecked == null || !lastChecked.equals(LocalDate.now())) runCheck();
+        if (lastChecked == null || !lastChecked.equals(LocalDate.now(ZoneId.of("Asia/Kolkata")))) runCheck();
         return pendingReminders;
     }
 
     public String buildWarrantyReminderMsg(Customer c) {
-        int days = (int)(c.getWarrantyEnd().toEpochDay() - LocalDate.now().toEpochDay());
+        int days = (int)(c.getWarrantyEnd().toEpochDay() - LocalDate.now(ZoneId.of("Asia/Kolkata")).toEpochDay());
         return "Namaste " + c.getName() + " ji! 🙏\n\n"
             + "Aapki *" + c.getMachineType() + " (" + c.getMachineBrand() + ")* ki warranty "
             + (days <= 0 ? "expire ho gayi hai ❌" : days + " din mein expire hogi ⚠️") + "\n"

@@ -6,6 +6,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 
 @Component
@@ -20,7 +21,7 @@ public class ReminderScheduler {
     // Ye method har din 8 baje chalega
     @Scheduled(cron = "0 0 8 * * ?")
     public void sendReminders() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Kolkata"));
         LocalDate next30 = today.plusDays(30);
 
         // Pending service

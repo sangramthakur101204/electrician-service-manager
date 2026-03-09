@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
@@ -29,9 +30,10 @@ public class WhatsAppReminderScheduler {
      * In production, replace System.out.println with actual
      * WhatsApp Business API calls (e.g., Twilio, WATI, etc.)
      */
-    @Scheduled(cron = "0 0 9 * * ?")
+    // DISABLED: ReminderService already handles 9AM warranty check — this was duplicate
+    // @Scheduled(cron = "0 0 9 * * ?")
     public void sendWhatsAppReminders() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Kolkata"));
         LocalDate next30 = today.plusDays(30);
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd MMM yyyy");
 
