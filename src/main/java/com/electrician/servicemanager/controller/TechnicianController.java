@@ -34,7 +34,7 @@ public class TechnicianController {
     @GetMapping
     public ResponseEntity<List<User>> getMyTechnicians(HttpServletRequest req) {
         User owner = (User) req.getAttribute("currentUser");
-        List<User> technicians = userRepository.findByOwnerIdAndRole(owner.getId(), "TECHNICIAN");
+        List<User> technicians = userRepository.findTechsByOwnerAndRole(owner.getId(), "TECHNICIAN");
         return ResponseEntity.ok(technicians);
     }
 
@@ -113,12 +113,12 @@ public class TechnicianController {
                         .body(Map.of("error", "Tumhara technician nahi hai"));
             }
             // Check for active/assigned jobs before deleting
-            long activeJobs = jobRepository.findByTechnicianId(tech.getId()).stream()
-                .filter(j -> !List.of("DONE","CANCELLED").contains(j.getStatus()))
-                .count();
+            long activeJobs = jobRepository.findJobsByTechnician(tech.getId()).stream()
+                    .filter(j -> !List.of("DONE","CANCELLED").contains(j.getStatus()))
+                    .count();
             if (activeJobs > 0) {
                 return ResponseEntity.badRequest().body(Map.of(
-                    "error", tech.getName() + " ke paas " + activeJobs + " active job(s) hain — pehle complete/cancel karo"
+                        "error", tech.getName() + " ke paas " + activeJobs + " active job(s) hain — pehle complete/cancel karo"
                 ));
             }
             userRepository.deleteById(id);

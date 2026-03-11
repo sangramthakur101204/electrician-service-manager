@@ -14,8 +14,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
     boolean existsByMobile(String mobile);
 
     @Query("SELECT u FROM User u WHERE u.owner.id = :ownerId AND u.role = :role")
-    List<User> findByOwnerIdAndRole(@Param("ownerId") Long ownerId, @Param("role") String role);
+    List<User> findTechsByOwnerAndRole(@Param("ownerId") Long ownerId, @Param("role") String role);
 
     @Query("SELECT u FROM User u WHERE u.owner.id = :ownerId AND u.role = :role AND u.isActive = :isActive")
-    List<User> findByOwnerIdAndRoleAndIsActive(@Param("ownerId") Long ownerId, @Param("role") String role, @Param("isActive") Boolean isActive);
+    List<User> findTechsByOwnerAndRoleAndActive(@Param("ownerId") Long ownerId, @Param("role") String role, @Param("isActive") Boolean isActive);
 }

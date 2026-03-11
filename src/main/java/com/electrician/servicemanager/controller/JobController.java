@@ -36,23 +36,23 @@ public class JobController {
     public ResponseEntity<List<Job>> getAllJobs(@RequestParam(required=false) String status, HttpServletRequest req) {
         User user = (User) req.getAttribute("currentUser");
         if ("TECHNICIAN".equals(user.getRole()))
-            return ResponseEntity.ok(jobRepository.findByTechnicianId(user.getId()));
+            return ResponseEntity.ok(jobRepository.findJobsByTechnician(user.getId()));
         List<Job> jobs = status != null
-                ? jobRepository.findByOwnerIdAndStatus(user.getId(), status)
-                : jobRepository.findByOwnerId(user.getId());
+                ? jobRepository.findJobsByOwnerAndStatus(user.getId(), status)
+                : jobRepository.findJobsByOwner(user.getId());
         return ResponseEntity.ok(jobs);
     }
 
     @GetMapping("/my-jobs")
     public ResponseEntity<List<Job>> getMyJobs(HttpServletRequest req) {
         User tech = (User) req.getAttribute("currentUser");
-        return ResponseEntity.ok(jobRepository.findActivByTechnicianId(tech.getId()));
+        return ResponseEntity.ok(jobRepository.findActiveJobsByTechnician(tech.getId()));
     }
 
     @GetMapping("/my-history")
     public ResponseEntity<List<Job>> getMyHistory(HttpServletRequest req) {
         User tech = (User) req.getAttribute("currentUser");
-        return ResponseEntity.ok(jobRepository.findByTechnicianId(tech.getId()));
+        return ResponseEntity.ok(jobRepository.findJobsByTechnician(tech.getId()));
     }
 
     // ── CREATE JOB — auto customer create ────────────────────────────────────
@@ -113,7 +113,7 @@ public class JobController {
                 "whatsappMsg",  waMsg != null ? waMsg : "",
                 "whatsappUrl",  waMsg != null
                         ? "https://wa.me/91" + saved.getTechnician().getMobile()
-                          + "?text=" + java.net.URLEncoder.encode(waMsg, java.nio.charset.StandardCharsets.UTF_8)
+                        + "?text=" + java.net.URLEncoder.encode(waMsg, java.nio.charset.StandardCharsets.UTF_8)
                         : ""
         ));
     }
@@ -168,17 +168,17 @@ public class JobController {
                 String time  = saved.getScheduledTime() != null ? saved.getScheduledTime() : "";
                 String when  = time.isBlank() ? date : date + " " + time;
                 String waMsg = "🙏 Namaste " + nvl(saved.getDisplayName()) + " ji!\n\n"
-                    + "Aapka service request confirm ho gaya hai. ✅\n\n"
-                    + "👷 Technician: *" + techName + "*\n"
-                    + "📞 Tech Mobile: " + techMobile + "\n"
-                    + "📅 Schedule: *" + when + "*\n"
-                    + "🔧 Machine: " + nvl(saved.getMachineType())
-                    + (saved.getMachineBrand()!=null ? " - "+saved.getMachineBrand() : "") + "\n\n"
-                    + "Koi problem ho toh humse directly contact karein.\n"
-                    + "Dhanyawad! 🙏";
+                        + "Aapka service request confirm ho gaya hai. ✅\n\n"
+                        + "👷 Technician: *" + techName + "*\n"
+                        + "📞 Tech Mobile: " + techMobile + "\n"
+                        + "📅 Schedule: *" + when + "*\n"
+                        + "🔧 Machine: " + nvl(saved.getMachineType())
+                        + (saved.getMachineBrand()!=null ? " - "+saved.getMachineBrand() : "") + "\n\n"
+                        + "Koi problem ho toh humse directly contact karein.\n"
+                        + "Dhanyawad! 🙏";
                 String waUrl = custMobile != null && !custMobile.isBlank()
-                    ? "https://wa.me/91" + custMobile + "?text=" + java.net.URLEncoder.encode(waMsg, java.nio.charset.StandardCharsets.UTF_8)
-                    : null;
+                        ? "https://wa.me/91" + custMobile + "?text=" + java.net.URLEncoder.encode(waMsg, java.nio.charset.StandardCharsets.UTF_8)
+                        : null;
                 return ResponseEntity.ok(Map.of("job", saved, "whatsappUrl", waUrl != null ? waUrl : ""));
             }
             return ResponseEntity.ok(saved);
@@ -260,10 +260,10 @@ public class JobController {
             }
 
             return ResponseEntity.ok(Map.of(
-                "message",      "Job complete ho gaya!",
-                "jobId",        id,
-                "whatsappUrl",  waUrl,
-                "customerMobile", customerMobile != null ? customerMobile : ""
+                    "message",      "Job complete ho gaya!",
+                    "jobId",        id,
+                    "whatsappUrl",  waUrl,
+                    "customerMobile", customerMobile != null ? customerMobile : ""
             ));
         } catch (Exception e) {
             return ResponseEntity.status(500).body(Map.of("error", e.getMessage(), "trace", e.getClass().getSimpleName()));

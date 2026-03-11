@@ -28,8 +28,8 @@ public class CustomerController {
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("dd MMM yyyy");
 
     public CustomerController(CustomerRepository customerRepository,
-                               JobRepository jobRepository,
-                               InvoiceRepository invoiceRepository) {
+                              JobRepository jobRepository,
+                              InvoiceRepository invoiceRepository) {
         this.customerRepository = customerRepository;
         this.jobRepository      = jobRepository;
         this.invoiceRepository  = invoiceRepository;
@@ -51,7 +51,7 @@ public class CustomerController {
     public ResponseEntity<List<Customer>> getAllCustomers(HttpServletRequest req) {
         User owner = (User) req.getAttribute("currentUser");
         if (owner == null) return ResponseEntity.ok(customerRepository.findAll());
-        return ResponseEntity.ok(customerRepository.findByOwnerIdOrOwnerIsNull(owner.getId()));
+        return ResponseEntity.ok(customerRepository.findCustomersByOwner(owner.getId()));
     }
 
     @GetMapping("/{id}")
@@ -88,13 +88,12 @@ public class CustomerController {
     public ResponseEntity<Void> deleteCustomer(@PathVariable Long id) {
         if (!customerRepository.existsById(id)) return ResponseEntity.notFound().build();
 
-        // Nullify customer FK in jobs (orphan jobs stay, not deleted)
-        jobRepository.findByCustomerId(id)
-            .forEach(j -> { j.setCustomer(null); jobRepository.save(j); });
+        // Nullify customer FK in jobs using direct DB query (no setCustomer needed)
+        jobRepository.detachCustomerFromJobs(id);
 
         // Delete all invoices for this customer
-        invoiceRepository.findByCustomerId(id)
-            .forEach(invoiceRepository::delete);
+        invoiceRepository.findInvoicesByCustomer(id)
+                .forEach(invoiceRepository::delete);
 
         customerRepository.deleteById(id);
         return ResponseEntity.noContent().build();
@@ -213,14 +212,14 @@ public class CustomerController {
         LocalDate today = LocalDate.now(ZoneId.of("Asia/Kolkata"));
         LocalDate next30 = today.plusDays(30);
         List<Customer> all = owner != null
-            ? customerRepository.findByOwnerIdOrOwnerIsNull(owner.getId())
-            : customerRepository.findAll();
+                ? customerRepository.findCustomersByOwner(owner.getId())
+                : customerRepository.findAll();
         return ResponseEntity.ok(
-            all.stream()
-               .filter(c -> c.getWarrantyEnd() != null
-                         && !c.getWarrantyEnd().isBefore(today)
-                         && !c.getWarrantyEnd().isAfter(next30))
-               .toList()
+                all.stream()
+                        .filter(c -> c.getWarrantyEnd() != null
+                                && !c.getWarrantyEnd().isBefore(today)
+                                && !c.getWarrantyEnd().isAfter(next30))
+                        .toList()
         );
     }
 

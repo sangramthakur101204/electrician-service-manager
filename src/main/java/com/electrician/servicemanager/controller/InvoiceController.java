@@ -87,8 +87,8 @@ public class InvoiceController {
 
             String method = req.getPaymentMethod();
             invoice.setPaymentStatus(
-                method != null && (method.equalsIgnoreCase("Cash") || method.equalsIgnoreCase("UPI"))
-                    ? "PAID" : "UNPAID"
+                    method != null && (method.equalsIgnoreCase("Cash") || method.equalsIgnoreCase("UPI"))
+                            ? "PAID" : "UNPAID"
             );
 
             // ── STEP 3: Save invoice header (one save only) ───────────────
@@ -124,10 +124,10 @@ public class InvoiceController {
         if (owner == null) return ResponseEntity.ok(all);
         // Filter: only invoices for this owner's customers
         return ResponseEntity.ok(all.stream()
-            .filter(i -> i.getCustomer() == null ||
-                         i.getCustomer().getOwner() == null ||
-                         owner.getId().equals(i.getCustomer().getOwner().getId()))
-            .collect(java.util.stream.Collectors.toList()));
+                .filter(i -> i.getCustomer() == null ||
+                        i.getCustomer().getOwner() == null ||
+                        owner.getId().equals(i.getCustomer().getOwner().getId()))
+                .collect(java.util.stream.Collectors.toList()));
     }
 
     @GetMapping("/{id}")
@@ -139,7 +139,7 @@ public class InvoiceController {
 
     @GetMapping("/customer/{customerId}")
     public ResponseEntity<List<Invoice>> getByCustomer(@PathVariable Long customerId) {
-        return ResponseEntity.ok(invoiceRepository.findByCustomerId(customerId));
+        return ResponseEntity.ok(invoiceRepository.getInvoicesByCustomerId(customerId));
     }
 
     // ── MARK PAID ─────────────────────────────────────────────────────────────

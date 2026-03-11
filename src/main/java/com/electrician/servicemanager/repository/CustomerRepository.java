@@ -9,35 +9,26 @@ import java.util.List;
 
 public interface CustomerRepository extends JpaRepository<Customer, Long> {
 
-    // Name se search
     List<Customer> findByNameContainingIgnoreCase(String name);
-
-    // Machine / Brand / Model / Serial filters
     List<Customer> findByMachineType(String machineType);
     List<Customer> findByMachineBrand(String machineBrand);
     List<Customer> findByModel(String model);
     List<Customer> findBySerialNumber(String serialNumber);
-
-    // Service date filters (purchaseDate hata diya ✅)
     List<Customer> findByServiceDate(LocalDate date);
 
     @Query("SELECT c FROM Customer c WHERE c.serviceDate BETWEEN :start AND :end")
     List<Customer> findByServiceDateBetween(@Param("start") LocalDate start, @Param("end") LocalDate end);
 
-    // Warranty date filters
     List<Customer> findByWarrantyEnd(LocalDate date);
 
     @Query("SELECT c FROM Customer c WHERE c.warrantyEnd BETWEEN :start AND :end")
     List<Customer> findByWarrantyEndBetween(@Param("start") LocalDate start, @Param("end") LocalDate end);
 
-    // Status filter
     List<Customer> findByServiceStatus(String serviceStatus);
 
-    // Owner filter (returns owner's customers + legacy records with no owner)
     @Query("SELECT c FROM Customer c WHERE c.owner.id = :ownerId OR c.owner IS NULL")
-    List<Customer> findByOwnerIdOrOwnerIsNull(@Param("ownerId") Long ownerId);
+    List<Customer> findCustomersByOwner(@Param("ownerId") Long ownerId);
 
-    // Owner + status
     @Query("SELECT c FROM Customer c WHERE (c.owner.id = :ownerId OR c.owner IS NULL) AND c.serviceStatus = :status")
-    List<Customer> findByOwnerIdOrOwnerIsNullAndStatus(@Param("ownerId") Long ownerId, @Param("status") String status);
+    List<Customer> findCustomersByOwnerAndStatus(@Param("ownerId") Long ownerId, @Param("status") String status);
 }
