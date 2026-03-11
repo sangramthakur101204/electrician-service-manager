@@ -139,7 +139,7 @@ public class InvoiceController {
 
     @GetMapping("/customer/{customerId}")
     public ResponseEntity<List<Invoice>> getByCustomer(@PathVariable Long customerId) {
-        return ResponseEntity.ok(invoiceRepository.getInvoicesByCustomerId(customerId));
+        return ResponseEntity.ok(invoiceRepository.findInvoicesByCustomer(customerId));
     }
 
     // ── MARK PAID ─────────────────────────────────────────────────────────────
