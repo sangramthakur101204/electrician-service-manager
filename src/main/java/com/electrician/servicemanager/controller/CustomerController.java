@@ -2,6 +2,7 @@ package com.electrician.servicemanager.controller;
 
 import com.electrician.servicemanager.entity.Customer;
 import com.electrician.servicemanager.entity.User;
+import com.electrician.servicemanager.repository.CustomerMachineRepository;
 import com.electrician.servicemanager.repository.CustomerRepository;
 import com.electrician.servicemanager.repository.JobRepository;
 import com.electrician.servicemanager.repository.InvoiceRepository;
@@ -25,23 +26,47 @@ public class CustomerController {
     private final CustomerRepository customerRepository;
     private final JobRepository       jobRepository;
     private final InvoiceRepository   invoiceRepository;
+    private final CustomerMachineRepository machineRepository;
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("dd MMM yyyy");
 
     public CustomerController(CustomerRepository customerRepository,
                               JobRepository jobRepository,
-                              InvoiceRepository invoiceRepository) {
+                              InvoiceRepository invoiceRepository,
+                              CustomerMachineRepository machineRepository) {
         this.customerRepository = customerRepository;
         this.jobRepository      = jobRepository;
         this.invoiceRepository  = invoiceRepository;
+        this.machineRepository  = machineRepository;
     }
 
     // ── CRUD ──────────────────────────────────────────────
 
     @PostMapping
-    public ResponseEntity<Customer> addCustomer(@RequestBody Customer customer,
-                                                HttpServletRequest req) {
+    public ResponseEntity<?> addCustomer(@RequestBody Customer customer,
+                                         HttpServletRequest req) {
         User owner = (User) req.getAttribute("currentUser");
         if (owner != null) customer.setOwner(owner);
+
+        // ── Duplicate mobile check per owner ──
+        String mobile = customer.getMobile();
+        if (mobile != null && !mobile.isBlank()) {
+            List<Customer> existing = owner != null
+                    ? customerRepository.findCustomersByOwner(owner.getId())
+                    : customerRepository.findAll();
+            boolean dup = existing.stream().anyMatch(c -> mobile.equals(c.getMobile()));
+            if (dup) {
+                Customer existingCust = existing.stream()
+                        .filter(c -> mobile.equals(c.getMobile()))
+                        .findFirst().orElse(null);
+                return ResponseEntity.status(409).body(java.util.Map.of(
+                        "error", "duplicate_mobile",
+                        "message", "Yeh mobile number pehle se registered hai",
+                        "existingId", existingCust != null ? existingCust.getId() : null,
+                        "existingName", existingCust != null ? existingCust.getName() : ""
+                ));
+            }
+        }
+
         if (customer.getServiceStatus() == null) customer.setServiceStatus("PENDING");
         customer.setWarrantyEnd(calcWarrantyEnd(customer.getServiceDate(), customer.getWarrantyPeriod()));
         return ResponseEntity.ok(customerRepository.save(customer));
@@ -88,7 +113,10 @@ public class CustomerController {
     public ResponseEntity<Void> deleteCustomer(@PathVariable Long id) {
         if (!customerRepository.existsById(id)) return ResponseEntity.notFound().build();
 
-        // Nullify customer FK in jobs using direct DB query (no setCustomer needed)
+        // Delete machines first
+        machineRepository.deleteByCustomerId(id);
+
+        // Nullify customer FK in jobs
         jobRepository.detachCustomerFromJobs(id);
 
         // Delete all invoices for this customer
