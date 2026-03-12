@@ -9,6 +9,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 
@@ -35,12 +39,22 @@ public class TechnicianController {
     public ResponseEntity<List<User>> getMyTechnicians(HttpServletRequest req) {
         User owner = (User) req.getAttribute("currentUser");
         List<User> technicians = userRepository.findTechsByOwnerAndRole(owner.getId(), "TECHNICIAN");
-        // Auto-fix: agar isActive=true hai but activeStartedAt null hai → stale data, force inactive
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Kolkata"));
         technicians.forEach(t -> {
+            boolean changed = false;
+            // Auto-fix stale isActive: if active=true but no session started → force inactive
             if (Boolean.TRUE.equals(t.getIsActive()) && t.getActiveStartedAt() == null) {
                 t.setIsActive(false);
-                userRepository.save(t);
+                changed = true;
             }
+            // Reset daily counter if it's a new day
+            if (t.getLastActiveDate() != null && !today.equals(t.getLastActiveDate())
+                    && !Boolean.TRUE.equals(t.getIsActive())) {
+                t.setTodayActiveMins(0);
+                t.setLastActiveDate(today);
+                changed = true;
+            }
+            if (changed) userRepository.save(t);
         });
         return ResponseEntity.ok(technicians);
     }
@@ -102,17 +116,41 @@ public class TechnicianController {
         User owner = (User) req.getAttribute("currentUser");
 
         return userRepository.findById(id).map(tech -> {
-            tech.setIsActive(!tech.getIsActive());
-            if (tech.getIsActive()) {
-                // Going Active — save start timestamp
-                tech.setActiveStartedAt(java.time.LocalDateTime.now(java.time.ZoneId.of("Asia/Kolkata")));
+            boolean goingActive = !Boolean.TRUE.equals(tech.getIsActive());
+            LocalDate today = LocalDate.now(ZoneId.of("Asia/Kolkata"));
+
+            if (goingActive) {
+                // Going Active — reset daily counter if new day, then save start time
+                if (!today.equals(tech.getLastActiveDate())) {
+                    tech.setTodayActiveMins(0);
+                    tech.setLastActiveDate(today);
+                }
+                tech.setIsActive(true);
+                tech.setActiveStartedAt(LocalDateTime.now(ZoneId.of("Asia/Kolkata")));
             } else {
-                // Going Inactive — clear timestamp
+                // Going Inactive — calculate this session's duration and add to today's total
+                if (tech.getActiveStartedAt() != null) {
+                    long sessionMins = ChronoUnit.MINUTES.between(
+                            tech.getActiveStartedAt(),
+                            LocalDateTime.now(ZoneId.of("Asia/Kolkata")));
+                    // If date rolled over during session, reset first
+                    if (!today.equals(tech.getLastActiveDate())) {
+                        tech.setTodayActiveMins((int) sessionMins);
+                        tech.setLastActiveDate(today);
+                    } else {
+                        int prev = tech.getTodayActiveMins() != null ? tech.getTodayActiveMins() : 0;
+                        tech.setTodayActiveMins((int)(prev + sessionMins));
+                    }
+                }
+                tech.setIsActive(false);
                 tech.setActiveStartedAt(null);
             }
             userRepository.save(tech);
             String status = tech.getIsActive() ? "Active" : "Inactive";
-            return ResponseEntity.ok(Map.of("message", tech.getName() + " " + status + " kar diya"));
+            return ResponseEntity.ok(Map.of(
+                    "message", tech.getName() + " " + status + " kar diya",
+                    "todayActiveMins", tech.getTodayActiveMins() != null ? tech.getTodayActiveMins() : 0
+            ));
         }).orElse(ResponseEntity.notFound().build());
     }
 

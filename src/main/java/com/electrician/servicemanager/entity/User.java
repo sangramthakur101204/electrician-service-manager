@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -33,6 +34,12 @@ public class User {
 
     // Jab tech Active karta hai tab ka timestamp — owner page pe duration calculate karne ke liye
     private LocalDateTime activeStartedAt;
+
+    // Aaj ka total active time (minutes) — har session add hota rehta hai
+    private Integer todayActiveMins = 0;
+
+    // Jis date ka todayActiveMins hai — nayi date pe auto-reset hoga
+    private LocalDate lastActiveDate;
 
     // Technician kis owner ka hai
     @ManyToOne
