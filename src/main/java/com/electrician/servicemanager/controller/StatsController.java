@@ -105,7 +105,8 @@ public class StatsController {
                     t.put("name",             tech.getName());
                     t.put("mobile",           tech.getMobile());
                     t.put("isActive",         tech.getIsActive());
-                    t.put("activeStartedAt",  tech.getActiveStartedAt()); // for frontend duration calc
+                    t.put("activeStartedAt",  tech.getActiveStartedAt() != null
+                            ? tech.getActiveStartedAt().toString() : null); // ISO string for JS
                     t.put("totalJobs",        techJobs.size());
                     // doneJobs per period — completedAt ya scheduledDate se filter
                     t.put("doneJobs",         techJobs.stream().filter(j->"DONE".equals(j.getStatus())).count());

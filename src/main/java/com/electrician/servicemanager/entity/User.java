@@ -1,5 +1,6 @@
 package com.electrician.servicemanager.entity;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
@@ -33,6 +34,7 @@ public class User {
     private Boolean isActive = false;  // Tech khud Active button dabaye tab hi true hoga
 
     // Jab tech Active karta hai tab ka timestamp — owner page pe duration calculate karne ke liye
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime activeStartedAt;
 
     // Aaj ka total active time (minutes) — har session add hota rehta hai

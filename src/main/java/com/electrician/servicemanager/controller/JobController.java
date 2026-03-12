@@ -1,8 +1,10 @@
 package com.electrician.servicemanager.controller;
 
 import com.electrician.servicemanager.entity.Customer;
+import com.electrician.servicemanager.entity.CompanySettings;
 import com.electrician.servicemanager.entity.Job;
 import com.electrician.servicemanager.entity.User;
+import com.electrician.servicemanager.repository.CompanySettingsRepository;
 import com.electrician.servicemanager.repository.CustomerRepository;
 import com.electrician.servicemanager.repository.JobRepository;
 import com.electrician.servicemanager.repository.UserRepository;
@@ -21,14 +23,17 @@ import java.util.Map;
 @CrossOrigin(origins = "*")
 public class JobController {
 
-    private final JobRepository     jobRepository;
-    private final UserRepository    userRepository;
-    private final CustomerRepository customerRepository;
+    private final JobRepository              jobRepository;
+    private final UserRepository             userRepository;
+    private final CustomerRepository         customerRepository;
+    private final CompanySettingsRepository  settingsRepository;
 
-    public JobController(JobRepository jobRepo, UserRepository userRepo, CustomerRepository cusRepo) {
+    public JobController(JobRepository jobRepo, UserRepository userRepo,
+                         CustomerRepository cusRepo, CompanySettingsRepository settingsRepo) {
         this.jobRepository      = jobRepo;
         this.userRepository     = userRepo;
         this.customerRepository = cusRepo;
+        this.settingsRepository = settingsRepo;
     }
 
     // ── GET ALL ──────────────────────────────────────────────────────────────
@@ -167,6 +172,11 @@ public class JobController {
                 String date  = saved.getScheduledDate() != null ? saved.getScheduledDate().toString() : "-";
                 String time  = saved.getScheduledTime() != null ? saved.getScheduledTime() : "";
                 String when  = time.isBlank() ? date : date + " " + time;
+                CompanySettings _cs = saved.getOwner() != null
+                        ? settingsRepository.findById(saved.getOwner().getId()).orElse(null) : null;
+                String _compName = (_cs != null && _cs.getCompanyName() != null)
+                        ? _cs.getCompanyName() : "Matoshree Enterprises";
+                String _footer = saved.getOwner() != null ? buildFooter(saved.getOwner().getId()) : "";
                 String waMsg = "🙏 Namaste " + nvl(saved.getDisplayName()) + " ji!\n\n"
                         + "Aapka service request confirm ho gaya hai. ✅\n\n"
                         + "👷 Technician: *" + techName + "*\n"
@@ -175,7 +185,8 @@ public class JobController {
                         + "🔧 Machine: " + nvl(saved.getMachineType())
                         + (saved.getMachineBrand()!=null ? " - "+saved.getMachineBrand() : "") + "\n\n"
                         + "Koi problem ho toh humse directly contact karein.\n"
-                        + "Dhanyawad! 🙏";
+                        + "Dhanyawad! 🙏\n\n"
+                        + "— " + _compName + _footer;
                 String waUrl = custMobile != null && !custMobile.isBlank()
                         ? "https://wa.me/91" + custMobile + "?text=" + java.net.URLEncoder.encode(waMsg, java.nio.charset.StandardCharsets.UTF_8)
                         : null;
@@ -249,12 +260,21 @@ public class JobController {
                 String techName = req.getAttribute("currentUser") != null
                         ? ((com.electrician.servicemanager.entity.User)req.getAttribute("currentUser")).getName()
                         : "Technician";
+                User techUser = (User) req.getAttribute("currentUser");
+                String _cmpName2 = "Matoshree Enterprises";
+                String _footer2 = "";
+                if (job.getOwner() != null) {
+                    CompanySettings _cs2 = settingsRepository.findById(job.getOwner().getId()).orElse(null);
+                    if (_cs2 != null && _cs2.getCompanyName() != null) _cmpName2 = _cs2.getCompanyName();
+                    _footer2 = buildFooter(job.getOwner().getId());
+                }
                 String msg = "Namaste " + nvl(customerName) + " ji! 🙏\n\n"
-                        + "Aapki " + nvl(machineType) + " (" + nvl(machineBrand) + ") ki service complete ho gayi.\n"
-                        + (cr.getServiceDetails() != null ? "✅ Kaam kiya: " + cr.getServiceDetails() + "\n" : "")
-                        + (cr.getWarrantyPeriod() != null ? "🛡️ Warranty: " + cr.getWarrantyPeriod() + "\n" : "")
+                        + "Aapki " + nvl(machineType) + " (" + nvl(machineBrand) + ") ki service complete ho gayi. ✅\n"
+                        + (cr.getServiceDetails() != null ? "\n✅ Kaam kiya: " + cr.getServiceDetails() + "\n" : "")
+                        + (cr.getWarrantyPeriod() != null && !"No Warranty".equals(cr.getWarrantyPeriod()) ? "🛡️ Warranty: " + cr.getWarrantyPeriod() + "\n" : "")
                         + "\nKoi bhi problem ho toh call karein.\n"
-                        + "- " + techName + ", Matoshree Enterprises";
+                        + "Dhanyawad! 🙏\n\n"
+                        + "— " + techName + ", " + _cmpName2 + _footer2;
                 waUrl = "https://wa.me/91" + customerMobile
                         + "?text=" + java.net.URLEncoder.encode(msg, java.nio.charset.StandardCharsets.UTF_8);
             }
@@ -278,7 +298,43 @@ public class JobController {
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+    private String buildFooter(Long ownerId) {
+        try {
+            CompanySettings cs = settingsRepository.findById(ownerId).orElse(null);
+            if (cs == null) return "";
+            StringBuilder sb = new StringBuilder();
+            if (cs.getCompanyPhone()  != null && !cs.getCompanyPhone().isBlank())  sb.append("\n📞 ").append(cs.getCompanyPhone());
+            if (cs.getCompanyPhone2() != null && !cs.getCompanyPhone2().isBlank()) sb.append("\n📞 ").append(cs.getCompanyPhone2());
+            if (cs.getCompanyEmail()  != null && !cs.getCompanyEmail().isBlank())  sb.append("\n✉️ ").append(cs.getCompanyEmail());
+            if (cs.getCompanyAddress()!= null && !cs.getCompanyAddress().isBlank()) {
+                sb.append("\n📍 ").append(cs.getCompanyAddress());
+                sb.append("\n🗺️ https://maps.google.com/?q=")
+                        .append(java.net.URLEncoder.encode(cs.getCompanyAddress(), java.nio.charset.StandardCharsets.UTF_8));
+            }
+            try {
+                String linksJson = cs.getLinksJson();
+                if (linksJson != null && !linksJson.isBlank()) {
+                    com.fasterxml.jackson.databind.ObjectMapper om = new com.fasterxml.jackson.databind.ObjectMapper();
+                    com.fasterxml.jackson.databind.JsonNode arr = om.readTree(linksJson);
+                    for (com.fasterxml.jackson.databind.JsonNode n : arr) {
+                        String url = n.path("url").asText("");
+                        String label = n.path("label").asText("");
+                        if (!url.isBlank()) sb.append("\n🔗 ").append(label.isBlank() ? "" : label + ": ").append(url);
+                    }
+                }
+            } catch(Exception ignore) {}
+            return sb.length() > 0 ? "\n" + sb.toString() : "";
+        } catch (Exception e) { return ""; }
+    }
+
     private String buildWhatsAppMsg(Job job) {
+        String compName = "Matoshree Enterprises";
+        String footer = "";
+        if (job.getOwner() != null) {
+            CompanySettings cs = settingsRepository.findById(job.getOwner().getId()).orElse(null);
+            if (cs != null && cs.getCompanyName() != null) compName = cs.getCompanyName();
+            footer = buildFooter(job.getOwner().getId());
+        }
         String priority = "EMERGENCY".equals(job.getPriority()) ? "🚨 EMERGENCY JOB" : "🔧 NEW JOB ASSIGNED";
         return priority + "\n\nCustomer: " + job.getDisplayName()
                 + "\nMobile: "  + nvl(job.getDisplayMobile())
@@ -287,7 +343,7 @@ public class JobController {
                 + "\nMachine: "  + nvl(job.getMachineType())
                 + (job.getMachineBrand() != null ? " - " + job.getMachineBrand() : "")
                 + (job.getNotes() != null && !job.getNotes().isBlank() ? "\nNote: " + job.getNotes() : "")
-                + "\n\n- Matoshree Enterprises";
+                + "\n\n— " + compName + footer;
     }
     private String nvl(String s) { return s != null ? s : "-"; }
 
