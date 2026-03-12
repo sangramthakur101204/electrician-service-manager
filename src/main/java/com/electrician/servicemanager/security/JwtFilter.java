@@ -42,13 +42,13 @@ public class JwtFilter extends OncePerRequestFilter {
 
                 User user = userRepository.findById(userId).orElse(null);
 
-                if (user != null && user.getIsActive()) {
-                    // User ko request mein set karo
+                if (user != null) {
+                    // isActive = sirf duty status (kaam pe hai ya nahi), login/auth se koi lena dena nahi
                     UsernamePasswordAuthenticationToken auth =
-                        new UsernamePasswordAuthenticationToken(
-                            user, null,
-                            List.of(new SimpleGrantedAuthority("ROLE_" + role))
-                        );
+                            new UsernamePasswordAuthenticationToken(
+                                    user, null,
+                                    List.of(new SimpleGrantedAuthority("ROLE_" + role))
+                            );
                     SecurityContextHolder.getContext().setAuthentication(auth);
 
                     // Request attribute mein bhi daalo — controllers use kar sakein
