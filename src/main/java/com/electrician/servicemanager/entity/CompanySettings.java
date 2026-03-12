@@ -41,4 +41,8 @@ public class CompanySettings {
     // Owner's handwritten signature — stored as base64 PNG (from frontend canvas)
     @Column(columnDefinition = "TEXT")
     private String signatureBase64;
+
+    // Custom links — JSON array: [{label:"Website", url:"https://..."}, ...]
+    @Column(columnDefinition = "TEXT")
+    private String linksJson;
 }

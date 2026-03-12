@@ -40,9 +40,10 @@ public class AuthController {
                     .body(Map.of("error", "Mobile number registered nahi hai"));
         }
 
-        if (!user.getIsActive()) {
+
+        if (user == null || user.getRole() == null) {
             return ResponseEntity.status(401)
-                    .body(Map.of("error", "Account inactive hai — owner se contact karo"));
+                    .body(Map.of("error", "Account nahi mila"));
         }
 
         if (!passwordEncoder.matches(req.getPassword(), user.getPassword())) {
@@ -67,7 +68,7 @@ public class AuthController {
 
     // ── REGISTER OWNER ────────────────────────────────────────────────────────
     // POST /auth/register-owner
-    // Pehli baar setup ke liye — ek baar hi chalao
+
     @PostMapping("/register-owner")
     public ResponseEntity<?> registerOwner(@RequestBody RegisterRequest req) {
         if (userRepository.existsByMobile(req.getMobile())) {
