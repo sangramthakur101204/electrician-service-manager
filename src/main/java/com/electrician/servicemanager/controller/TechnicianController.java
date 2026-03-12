@@ -96,6 +96,13 @@ public class TechnicianController {
 
         return userRepository.findById(id).map(tech -> {
             tech.setIsActive(!tech.getIsActive());
+            if (tech.getIsActive()) {
+                // Going Active — save start timestamp
+                tech.setActiveStartedAt(java.time.LocalDateTime.now(java.time.ZoneId.of("Asia/Kolkata")));
+            } else {
+                // Going Inactive — clear timestamp
+                tech.setActiveStartedAt(null);
+            }
             userRepository.save(tech);
             String status = tech.getIsActive() ? "Active" : "Inactive";
             return ResponseEntity.ok(Map.of("message", tech.getName() + " " + status + " kar diya"));

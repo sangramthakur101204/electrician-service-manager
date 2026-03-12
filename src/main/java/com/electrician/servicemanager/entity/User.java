@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
+import java.time.LocalDateTime;
 
 @Entity
 @Data
@@ -29,6 +30,9 @@ public class User {
     private String role;
 
     private Boolean isActive = true;
+
+    // Jab tech Active karta hai tab ka timestamp — owner page pe duration calculate karne ke liye
+    private LocalDateTime activeStartedAt;
 
     // Technician kis owner ka hai
     @ManyToOne
