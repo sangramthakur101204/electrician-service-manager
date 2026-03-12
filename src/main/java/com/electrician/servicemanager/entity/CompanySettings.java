@@ -37,4 +37,8 @@ public class CompanySettings {
 
     @Column(columnDefinition = "TEXT")
     private String thankyouMsgTemplate;
+
+    // Owner's handwritten signature — stored as base64 PNG (from frontend canvas)
+    @Column(columnDefinition = "TEXT")
+    private String signatureBase64;
 }

@@ -1,9 +1,12 @@
 package com.electrician.servicemanager.service;
 
+import com.electrician.servicemanager.entity.CompanySettings;
 import com.electrician.servicemanager.entity.Customer;
 import com.electrician.servicemanager.entity.Invoice;
 import com.electrician.servicemanager.entity.InvoiceItem;
+import com.electrician.servicemanager.repository.CompanySettingsRepository;
 import com.itextpdf.io.font.constants.StandardFonts;
+import com.itextpdf.io.image.ImageDataFactory;
 import com.itextpdf.kernel.colors.ColorConstants;
 import com.itextpdf.kernel.colors.DeviceRgb;
 import com.itextpdf.kernel.font.PdfFont;
@@ -23,9 +26,16 @@ import org.springframework.stereotype.Service;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.time.format.DateTimeFormatter;
+import java.util.Base64;
 
 @Service
 public class InvoicePdfService {
+
+    private final CompanySettingsRepository settingsRepo;
+
+    public InvoicePdfService(CompanySettingsRepository settingsRepo) {
+        this.settingsRepo = settingsRepo;
+    }
 
     // ── Business Info ─────────────────────────────────────────────
     private static final String BUSINESS_NAME    = "MATOSHREE ENTERPRISES";
@@ -46,6 +56,17 @@ public class InvoicePdfService {
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("dd MMM yyyy");
 
     public byte[] generateInvoicePdf(Invoice invoice) throws IOException {
+        // Fetch owner's signature via customer → owner chain
+        String signatureBase64 = null;
+        try {
+            Long ownerId = invoice.getCustomer() != null && invoice.getCustomer().getOwner() != null
+                    ? invoice.getCustomer().getOwner().getId() : null;
+            if (ownerId != null) {
+                signatureBase64 = settingsRepo.findById(ownerId)
+                        .map(CompanySettings::getSignatureBase64)
+                        .orElse(null);
+            }
+        } catch (Exception ignored) {}
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         PdfWriter writer = new PdfWriter(baos);
         PdfDocument pdf = new PdfDocument(writer);
@@ -255,7 +276,7 @@ public class InvoicePdfService {
         }
 
         // ═══════════════════════════════════════════════════
-        // 6. FOOTER
+        // 6. FOOTER with Signature
         // ═══════════════════════════════════════════════════
         doc.add(new LineSeparator(new com.itextpdf.kernel.pdf.canvas.draw.SolidLine(1f))
                 .setStrokeColor(PRIMARY).setMarginBottom(6));
@@ -270,10 +291,26 @@ public class InvoicePdfService {
                 .setFont(regular).setFontSize(8).setFontColor(TEXT_GRAY));
 
         Cell fRight = new Cell().setBorder(Border.NO_BORDER).setTextAlignment(TextAlignment.RIGHT);
+
+        // Embed signature image if available, else show blank line
+        if (signatureBase64 != null && !signatureBase64.isBlank()) {
+            try {
+                String b64 = signatureBase64;
+                if (b64.contains(",")) b64 = b64.split(",", 2)[1]; // strip data:image/png;base64,
+                byte[] imgBytes = Base64.getDecoder().decode(b64);
+                Image sigImg = new Image(ImageDataFactory.create(imgBytes));
+                sigImg.setWidth(100).setHorizontalAlignment(HorizontalAlignment.RIGHT);
+                fRight.add(sigImg);
+            } catch (Exception e) {
+                fRight.add(new Paragraph("\n\n_____________________")
+                        .setFont(regular).setFontSize(9).setFontColor(TEXT_DARK));
+            }
+        } else {
+            fRight.add(new Paragraph("\n\n_____________________")
+                    .setFont(regular).setFontSize(9).setFontColor(TEXT_DARK));
+        }
         fRight.add(new Paragraph("Authorised Signature")
                 .setFont(regular).setFontSize(8).setFontColor(TEXT_GRAY));
-        fRight.add(new Paragraph("\n\n_____________________")
-                .setFont(regular).setFontSize(9).setFontColor(TEXT_DARK));
         fRight.add(new Paragraph(BUSINESS_NAME)
                 .setFont(bold).setFontSize(8).setFontColor(TEXT_DARK));
 
