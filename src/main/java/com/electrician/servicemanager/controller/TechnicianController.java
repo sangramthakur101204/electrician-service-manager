@@ -35,6 +35,13 @@ public class TechnicianController {
     public ResponseEntity<List<User>> getMyTechnicians(HttpServletRequest req) {
         User owner = (User) req.getAttribute("currentUser");
         List<User> technicians = userRepository.findTechsByOwnerAndRole(owner.getId(), "TECHNICIAN");
+        // Auto-fix: agar isActive=true hai but activeStartedAt null hai → stale data, force inactive
+        technicians.forEach(t -> {
+            if (Boolean.TRUE.equals(t.getIsActive()) && t.getActiveStartedAt() == null) {
+                t.setIsActive(false);
+                userRepository.save(t);
+            }
+        });
         return ResponseEntity.ok(technicians);
     }
 

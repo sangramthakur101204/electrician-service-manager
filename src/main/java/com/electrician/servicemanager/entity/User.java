@@ -29,7 +29,7 @@ public class User {
     // OWNER ya TECHNICIAN
     private String role;
 
-    private Boolean isActive = true;
+    private Boolean isActive = false;  // Tech khud Active button dabaye tab hi true hoga
 
     // Jab tech Active karta hai tab ka timestamp — owner page pe duration calculate karne ke liye
     private LocalDateTime activeStartedAt;
