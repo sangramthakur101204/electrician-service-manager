@@ -105,8 +105,18 @@ public class StatsController {
                     t.put("name",             tech.getName());
                     t.put("mobile",           tech.getMobile());
                     t.put("isActive",         tech.getIsActive());
+                    t.put("activeStartedAt",  tech.getActiveStartedAt()); // for frontend duration calc
                     t.put("totalJobs",        techJobs.size());
+                    // doneJobs per period — completedAt ya scheduledDate se filter
                     t.put("doneJobs",         techJobs.stream().filter(j->"DONE".equals(j.getStatus())).count());
+                    t.put("todayDoneJobs",    techJobs.stream().filter(j->"DONE".equals(j.getStatus())
+                            && today.equals(j.getScheduledDate())).count());
+                    t.put("yestDoneJobs",     techJobs.stream().filter(j->"DONE".equals(j.getStatus())
+                            && yesterday.equals(j.getScheduledDate())).count());
+                    t.put("weekDoneJobs",     techJobs.stream().filter(j->"DONE".equals(j.getStatus())
+                            && j.getScheduledDate()!=null && !j.getScheduledDate().isBefore(today.minusDays(6))).count());
+                    t.put("monthDoneJobs",    techJobs.stream().filter(j->"DONE".equals(j.getStatus())
+                            && j.getScheduledDate()!=null && !j.getScheduledDate().isBefore(monthStart)).count());
                     t.put("activeJobs",       techJobs.stream().filter(j->!List.of("DONE","CANCELLED").contains(j.getStatus())).count());
                     t.put("monthJobs",        techJobs.stream().filter(j->j.getScheduledDate()!=null&&!j.getScheduledDate().isBefore(monthStart)).count());
                     t.put("todayCollection",  Math.round(todayCollection));
