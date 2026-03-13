@@ -29,6 +29,25 @@ public class TechStatusSSEController {
         this.userRepository = userRepository;
     }
 
+    // ── Heartbeat every 20s — prevents Railway/Render 30s idle timeout ───────
+    @org.springframework.scheduling.annotation.Scheduled(fixedDelay = 20000)
+    public void heartbeat() {
+        String ping = "ping";
+        sendToAll(ownerEmitters, ping);
+        sendToAll(techEmitters, ping);
+    }
+
+    private static void sendToAll(ConcurrentHashMap<Long, CopyOnWriteArrayList<SseEmitter>> map, Object data) {
+        map.forEach((id, list) -> {
+            List<SseEmitter> dead = new ArrayList<>();
+            for (SseEmitter e : list) {
+                try { e.send(SseEmitter.event().name("heartbeat").data(data)); }
+                catch (IOException ex) { dead.add(e); }
+            }
+            list.removeAll(dead);
+        });
+    }
+
     // ── Owner subscribes — watches tech online/offline ──────────────────────
     @GetMapping(value = "/tech-status", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter subscribeOwner(HttpServletRequest req) {
