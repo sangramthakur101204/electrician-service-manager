@@ -111,12 +111,24 @@ public class TechnicianController {
     }
 
     // ── Technician Active/Inactive ────────────────────────────────────────────
+    // Optional query param: ?active=true or ?active=false
+    // If not provided → blind flip (backward compat)
     @PutMapping("/{id}/toggle")
-    public ResponseEntity<?> toggleActive(@PathVariable Long id, HttpServletRequest req) {
+    public ResponseEntity<?> toggleActive(@PathVariable Long id,
+                                          @RequestParam(required = false) Boolean active,
+                                          HttpServletRequest req) {
         User owner = (User) req.getAttribute("currentUser");
 
         return userRepository.findById(id).map(tech -> {
-            boolean goingActive = !Boolean.TRUE.equals(tech.getIsActive());
+            // If caller passes desired state explicitly → use it; else flip
+            boolean goingActive = (active != null) ? active : !Boolean.TRUE.equals(tech.getIsActive());
+            // Idempotent: already in desired state → just return current status
+            if (active != null && Boolean.TRUE.equals(tech.getIsActive()) == active) {
+                return ResponseEntity.ok(Map.of(
+                        "message", tech.getName() + (active ? " already Active" : " already Inactive"),
+                        "todayActiveMins", tech.getTodayActiveMins() != null ? tech.getTodayActiveMins() : 0
+                ));
+            }
             LocalDate today = LocalDate.now(ZoneId.of("Asia/Kolkata"));
 
             if (goingActive) {
