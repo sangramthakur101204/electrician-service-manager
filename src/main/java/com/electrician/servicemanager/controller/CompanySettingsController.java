@@ -20,9 +20,13 @@ public class CompanySettingsController {
 
     @GetMapping
     public ResponseEntity<CompanySettings> getSettings(HttpServletRequest req) {
-        User owner = (User) req.getAttribute("currentUser");
-        if (owner == null) return ResponseEntity.status(401).build();
-        return settingsRepository.findByOwnerId(owner.getId())
+        User user = (User) req.getAttribute("currentUser");
+        if (user == null) return ResponseEntity.status(401).build();
+        // Technician ke liye owner ki settings return karo
+        Long lookupId = "TECHNICIAN".equalsIgnoreCase(user.getRole()) && user.getOwnerId() != null
+                ? user.getOwnerId()
+                : user.getId();
+        return settingsRepository.findByOwnerId(lookupId)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.ok(new CompanySettings()));
     }
