@@ -27,6 +27,23 @@ public class AuthController {
         this.passwordEncoder = passwordEncoder;
     }
 
+    // ── ME — current user info (used by TechApp to sync active state) ─────────
+    // GET /auth/me
+    @GetMapping("/me")
+    public ResponseEntity<?> me(jakarta.servlet.http.HttpServletRequest req) {
+        User user = (User) req.getAttribute("currentUser");
+        if (user == null) return ResponseEntity.status(401).build();
+        Map<String, Object> resp = new HashMap<>();
+        resp.put("id",              user.getId());
+        resp.put("name",            user.getName());
+        resp.put("mobile",          user.getMobile());
+        resp.put("role",            user.getRole());
+        resp.put("isActive",        Boolean.TRUE.equals(user.getIsActive()));
+        resp.put("activeStartedAt", user.getActiveStartedAt() != null
+                ? user.getActiveStartedAt().toString() : null);
+        return ResponseEntity.ok(resp);
+    }
+
     // ── LOGIN ─────────────────────────────────────────────────────────────────
     // POST /auth/login
     // Body: { mobile, password }
