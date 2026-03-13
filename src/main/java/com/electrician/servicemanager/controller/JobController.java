@@ -113,6 +113,11 @@ public class JobController {
         Job saved = jobRepository.save(job);
         String waMsg = saved.getTechnician() != null ? buildWhatsAppMsg(saved) : null;
 
+        // Push real-time notification to technician
+        if (saved.getTechnician() != null) {
+            pushJobNotification(saved);
+        }
+
         return ResponseEntity.ok(Map.of(
                 "job",          saved,
                 "whatsappMsg",  waMsg != null ? waMsg : "",
@@ -190,6 +195,8 @@ public class JobController {
                 String waUrl = custMobile != null && !custMobile.isBlank()
                         ? "https://wa.me/91" + custMobile + "?text=" + java.net.URLEncoder.encode(waMsg, java.nio.charset.StandardCharsets.UTF_8)
                         : null;
+                // Push real-time notification to newly assigned technician
+                pushJobNotification(saved);
                 return ResponseEntity.ok(Map.of("job", saved, "whatsappUrl", waUrl != null ? waUrl : ""));
             }
             return ResponseEntity.ok(saved);
@@ -299,6 +306,21 @@ public class JobController {
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+    private void pushJobNotification(Job job) {
+        if (job.getTechnician() == null) return;
+        Long techId = job.getTechnician().getId();
+        String priority = "EMERGENCY".equals(job.getPriority()) ? "EMERGENCY" : "NORMAL";
+        java.util.Map<String, Object> data = new java.util.HashMap<>();
+        data.put("jobId",        job.getId());
+        data.put("customerName", job.getDisplayName());
+        data.put("address",      job.getDisplayAddress() != null ? job.getDisplayAddress() : "");
+        data.put("machineType",  job.getMachineType() != null ? job.getMachineType() : "");
+        data.put("priority",     priority);
+        data.put("scheduledDate", job.getScheduledDate() != null ? job.getScheduledDate().toString() : "");
+        data.put("scheduledTime", job.getScheduledTime() != null ? job.getScheduledTime() : "");
+        TechStatusSSEController.pushJobToTech(techId, data);
+    }
+
     private String buildFooter(Long ownerId) {
         try {
             CompanySettings cs = settingsRepository.findById(ownerId).orElse(null);
