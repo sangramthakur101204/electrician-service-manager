@@ -33,6 +33,14 @@ public class JwtFilter extends OncePerRequestFilter {
 
         String header = req.getHeader("Authorization");
 
+        // SSE ke liye: EventSource headers support nahi karta, so ?token= query param se bhi lo
+        if (header == null) {
+            String qToken = req.getParameter("token");
+            if (qToken != null && !qToken.isBlank()) {
+                header = "Bearer " + qToken;
+            }
+        }
+
         if (header != null && header.startsWith("Bearer ")) {
             String token = header.substring(7);
 

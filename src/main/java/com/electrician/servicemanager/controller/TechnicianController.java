@@ -159,8 +159,14 @@ public class TechnicianController {
             }
             userRepository.save(tech);
             String status = tech.getIsActive() ? "Active" : "Inactive";
+            // Push real-time update to owner via SSE
+            Long ownerId = tech.getOwnerId();
+            if (ownerId != null) {
+                TechStatusSSEController.pushStatusUpdate(ownerId, tech.getId(), tech.getName(), tech.getIsActive());
+            }
             return ResponseEntity.ok(Map.of(
                     "message", tech.getName() + " " + status + " kar diya",
+                    "isOnline", tech.getIsActive(),
                     "todayActiveMins", tech.getTodayActiveMins() != null ? tech.getTodayActiveMins() : 0
             ));
         }).orElse(ResponseEntity.notFound().build());
