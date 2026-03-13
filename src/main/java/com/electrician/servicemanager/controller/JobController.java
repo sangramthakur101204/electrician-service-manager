@@ -280,10 +280,11 @@ public class JobController {
             }
 
             return ResponseEntity.ok(Map.of(
-                    "message",      "Job complete ho gaya!",
-                    "jobId",        id,
-                    "whatsappUrl",  waUrl,
-                    "customerMobile", customerMobile != null ? customerMobile : ""
+                    "message",        "Job complete ho gaya!",
+                    "jobId",          id,
+                    "whatsappUrl",    waUrl,
+                    "customerMobile", customerMobile != null ? customerMobile : "",
+                    "customer",       customer != null ? customer : Map.of()
             ));
         } catch (Exception e) {
             return ResponseEntity.status(500).body(Map.of("error", e.getMessage(), "trace", e.getClass().getSimpleName()));
