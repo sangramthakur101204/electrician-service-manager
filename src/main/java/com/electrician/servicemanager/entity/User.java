@@ -49,6 +49,9 @@ public class User {
     @JsonIgnore
     private User owner;
 
+    // FCM token for push notifications
+    private String fcmToken;
+
     // Owner ka naam technician ke saath return karo
     public String getOwnerName() {
         return owner != null ? owner.getName() : null;

@@ -27,13 +27,16 @@ public class JobController {
     private final UserRepository             userRepository;
     private final CustomerRepository         customerRepository;
     private final CompanySettingsRepository  settingsRepository;
+    private final com.electrician.servicemanager.service.FCMService fcmService;
 
     public JobController(JobRepository jobRepo, UserRepository userRepo,
-                         CustomerRepository cusRepo, CompanySettingsRepository settingsRepo) {
+                         CustomerRepository cusRepo, CompanySettingsRepository settingsRepo,
+                         com.electrician.servicemanager.service.FCMService fcmService) {
         this.jobRepository      = jobRepo;
         this.userRepository     = userRepo;
         this.customerRepository = cusRepo;
         this.settingsRepository = settingsRepo;
+        this.fcmService         = fcmService;
     }
 
     // ── GET ALL ──────────────────────────────────────────────────────────────
@@ -319,6 +322,20 @@ public class JobController {
         data.put("scheduledDate", job.getScheduledDate() != null ? job.getScheduledDate().toString() : "");
         data.put("scheduledTime", job.getScheduledTime() != null ? job.getScheduledTime() : "");
         TechStatusSSEController.pushJobToTech(techId, data);
+
+        // FCM push notification — app band ho toh bhi aayega
+        User tech = job.getTechnician();
+        if (tech.getFcmToken() != null && !tech.getFcmToken().isEmpty()) {
+            String title = "EMERGENCY".equals(job.getPriority())
+                    ? "EMERGENCY Job!" : "Naya Job Assign Hua!";
+            String body = job.getDisplayName() + " - " +
+                    (job.getMachineType() != null ? job.getMachineType() : "") +
+                    (job.getDisplayAddress() != null ? " | " + job.getDisplayAddress() : "");
+            java.util.Map<String, String> fcmData = new java.util.HashMap<>();
+            fcmData.put("jobId", String.valueOf(job.getId()));
+            fcmData.put("priority", priority);
+            fcmService.sendNotification(tech.getFcmToken(), title, body, fcmData);
+        }
     }
 
     private String buildFooter(Long ownerId) {

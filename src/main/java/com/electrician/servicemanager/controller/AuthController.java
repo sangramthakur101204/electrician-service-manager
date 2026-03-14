@@ -6,6 +6,7 @@ import com.electrician.servicemanager.security.JwtUtil;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -30,7 +31,7 @@ public class AuthController {
     // ── ME — current user info (used by TechApp to sync active state) ─────────
     // GET /auth/me
     @GetMapping("/me")
-    public ResponseEntity<?> me(jakarta.servlet.http.HttpServletRequest req) {
+    public ResponseEntity<?> me(HttpServletRequest req) {
         User user = (User) req.getAttribute("currentUser");
         if (user == null) return ResponseEntity.status(401).build();
         Map<String, Object> resp = new HashMap<>();
@@ -129,4 +130,17 @@ public class AuthController {
         public String getPassword()          { return password; }
         public void setPassword(String v)    { password = v; }
     }
+    // ── FCM Token Save ────────────────────────────────────────────────────────
+    @PostMapping("/fcm-token")
+    public ResponseEntity<?> saveFcmToken(@RequestBody Map<String, String> body, HttpServletRequest req) {
+        User user = (User) req.getAttribute("currentUser");
+        if (user == null) return ResponseEntity.status(401).build();
+        String token = body.get("fcmToken");
+        if (token != null && !token.isEmpty()) {
+            user.setFcmToken(token);
+            userRepository.save(user);
+        }
+        return ResponseEntity.ok(Map.of("message", "FCM token saved"));
+    }
+
 }
