@@ -28,15 +28,18 @@ public class JobController {
     private final CustomerRepository         customerRepository;
     private final CompanySettingsRepository  settingsRepository;
     private final com.electrician.servicemanager.service.FCMService fcmService;
+    private final com.electrician.servicemanager.repository.InvoiceRepository invoiceRepository;
 
     public JobController(JobRepository jobRepo, UserRepository userRepo,
                          CustomerRepository cusRepo, CompanySettingsRepository settingsRepo,
-                         com.electrician.servicemanager.service.FCMService fcmService) {
+                         com.electrician.servicemanager.service.FCMService fcmService,
+                         com.electrician.servicemanager.repository.InvoiceRepository invoiceRepo) {
         this.jobRepository      = jobRepo;
         this.userRepository     = userRepo;
         this.customerRepository = cusRepo;
         this.settingsRepository = settingsRepo;
         this.fcmService         = fcmService;
+        this.invoiceRepository  = invoiceRepo;
     }
 
     // ── GET ALL ──────────────────────────────────────────────────────────────
@@ -58,9 +61,31 @@ public class JobController {
     }
 
     @GetMapping("/my-history")
-    public ResponseEntity<List<Job>> getMyHistory(HttpServletRequest req) {
+    public ResponseEntity<List<Map<String, Object>>> getMyHistory(HttpServletRequest req) {
         User tech = (User) req.getAttribute("currentUser");
-        return ResponseEntity.ok(jobRepository.findJobsByTechnician(tech.getId()));
+        List<Job> jobs = jobRepository.findJobsByTechnician(tech.getId());
+        // Add invoiceId to each job
+        List<Map<String, Object>> result = jobs.stream().map(job -> {
+            Map<String, Object> m = new java.util.LinkedHashMap<>();
+            m.put("id",               job.getId());
+            m.put("status",           job.getStatus());
+            m.put("problemDescription", job.getProblemDescription());
+            m.put("machineType",      job.getMachineType());
+            m.put("machineBrand",     job.getMachineBrand());
+            m.put("priority",         job.getPriority());
+            m.put("scheduledDate",    job.getScheduledDate());
+            m.put("scheduledTime",    job.getScheduledTime());
+            m.put("completedAt",      job.getCompletedAt());
+            m.put("customer",         job.getCustomer());
+            m.put("customerName",     job.getCustomerName());
+            m.put("customerMobile",   job.getCustomerMobile());
+            m.put("customerAddress",  job.getCustomerAddress());
+            // Lookup invoiceId
+            invoiceRepository.findByJobId(job.getId())
+                    .ifPresent(inv -> m.put("invoiceId", inv.getId()));
+            return m;
+        }).collect(java.util.stream.Collectors.toList());
+        return ResponseEntity.ok(result);
     }
 
     // ── CREATE JOB — auto customer create ────────────────────────────────────
