@@ -24,13 +24,19 @@ public class TechnicianController {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JobRepository jobRepository;
+    private final com.electrician.servicemanager.repository.TechSessionRepository techSessionRepository;
+    private final com.electrician.servicemanager.repository.TechnicianLocationRepository locationRepository;
 
     public TechnicianController(UserRepository userRepository,
                                 PasswordEncoder passwordEncoder,
-                                JobRepository jobRepository) {
-        this.userRepository  = userRepository;
-        this.passwordEncoder = passwordEncoder;
-        this.jobRepository   = jobRepository;
+                                JobRepository jobRepository,
+                                com.electrician.servicemanager.repository.TechSessionRepository techSessionRepository,
+                                com.electrician.servicemanager.repository.TechnicianLocationRepository locationRepository) {
+        this.userRepository        = userRepository;
+        this.passwordEncoder       = passwordEncoder;
+        this.jobRepository         = jobRepository;
+        this.techSessionRepository = techSessionRepository;
+        this.locationRepository    = locationRepository;
     }
 
     // ── Owner ke saare technicians ────────────────────────────────────────────
@@ -191,6 +197,11 @@ public class TechnicianController {
                         "error", tech.getName() + " ke paas " + activeJobs + " active job(s) hain — pehle complete/cancel karo"
                 ));
             }
+            // Pehle related data delete karo (foreign key constraint fix)
+            List<com.electrician.servicemanager.entity.TechSession> sessions =
+                    techSessionRepository.findByTechnicianId(tech.getId());
+            techSessionRepository.deleteAll(sessions);
+            locationRepository.deleteByTechnicianId(tech.getId());
             userRepository.deleteById(id);
             return ResponseEntity.ok(Map.of("message", tech.getName() + " delete ho gaya"));
         }).orElse(ResponseEntity.notFound().build());

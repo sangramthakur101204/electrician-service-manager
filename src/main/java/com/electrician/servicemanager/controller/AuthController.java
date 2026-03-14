@@ -69,6 +69,13 @@ public class AuthController {
                     .body(Map.of("error", "Password galat hai"));
         }
 
+        // Reset isActive on login — fresh start (stale state fix)
+        if ("TECHNICIAN".equals(user.getRole()) && Boolean.TRUE.equals(user.getIsActive())) {
+            user.setIsActive(false);
+            user.setActiveStartedAt(null);
+            userRepository.save(user);
+        }
+
         String token = jwtUtil.generateToken(user.getId(), user.getMobile(), user.getRole());
 
         Map<String, Object> response = new HashMap<>();

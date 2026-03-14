@@ -61,34 +61,36 @@ public class JobController {
     }
 
     @GetMapping("/my-history")
-    public ResponseEntity<List<Map<String, Object>>> getMyHistory(HttpServletRequest req) {
+    public ResponseEntity<List<java.util.LinkedHashMap>> getMyHistory(HttpServletRequest req) {
         User tech = (User) req.getAttribute("currentUser");
         List<Job> jobs = jobRepository.findJobsByTechnician(tech.getId());
-        // Add invoiceId to each job
-        List<Map<String, Object>> result = jobs.stream().map(job -> {
-            Map<String, Object> m = new java.util.LinkedHashMap<>();
-            m.put("id",               job.getId());
-            m.put("status",           job.getStatus());
+        List<java.util.LinkedHashMap> result = new java.util.ArrayList<>();
+        for (Job job : jobs) {
+            java.util.LinkedHashMap<String, Object> m = new java.util.LinkedHashMap<>();
+            m.put("id",                 job.getId());
+            m.put("status",             job.getStatus());
             m.put("problemDescription", job.getProblemDescription());
-            m.put("machineType",      job.getMachineType());
-            m.put("machineBrand",     job.getMachineBrand());
-            m.put("priority",         job.getPriority());
-            m.put("scheduledDate",    job.getScheduledDate());
-            m.put("scheduledTime",    job.getScheduledTime());
-            m.put("completedAt",      job.getCompletedAt());
-            m.put("customer",         job.getCustomer());
-            m.put("customerName",     job.getCustomerName());
-            m.put("customerMobile",   job.getCustomerMobile());
-            m.put("customerAddress",  job.getCustomerAddress());
-            // Lookup invoiceId
-            invoiceRepository.findByJobId(job.getId())
-                    .ifPresent(inv -> m.put("invoiceId", inv.getId()));
-            return m;
-        }).collect(java.util.stream.Collectors.toList());
+            m.put("machineType",        job.getMachineType());
+            m.put("machineBrand",       job.getMachineBrand());
+            m.put("priority",           job.getPriority());
+            m.put("scheduledDate",      job.getScheduledDate() != null ? job.getScheduledDate().toString() : null);
+            m.put("scheduledTime",      job.getScheduledTime());
+            m.put("completedAt",        job.getCompletedAt() != null ? job.getCompletedAt().toString() : null);
+            m.put("customer",           job.getCustomer());
+            m.put("customerName",       job.getDisplayName());
+            m.put("customerMobile",     job.getDisplayMobile());
+            m.put("customerAddress",    job.getDisplayAddress());
+            // Lookup invoiceId from invoice table
+            java.util.Optional<com.electrician.servicemanager.entity.Invoice> inv = invoiceRepository.findByJobId(job.getId());
+            if (inv.isPresent()) {
+                m.put("invoiceId", inv.get().getId());
+            }
+            result.add(m);
+        }
         return ResponseEntity.ok(result);
     }
 
-    // ── CREATE JOB — auto customer create ────────────────────────────────────
+    // ── CREATE JOB - auto customer create ────────────────────────────────────
     @PostMapping
     public ResponseEntity<?> createJob(@RequestBody JobRequest req2, HttpServletRequest req) {
         User owner = (User) req.getAttribute("currentUser");
@@ -146,13 +148,39 @@ public class JobController {
             pushJobNotification(saved);
         }
 
+        // Tech WA URL
+        String techWaUrl = waMsg != null && saved.getTechnician() != null
+                ? "https://wa.me/91" + saved.getTechnician().getMobile()
+                + "?text=" + java.net.URLEncoder.encode(waMsg, java.nio.charset.StandardCharsets.UTF_8)
+                : "";
+        // Customer WA URL
+        String custMobileC = saved.getDisplayMobile();
+        String custWaUrlC = "";
+        if (custMobileC != null && !custMobileC.isBlank() && saved.getTechnician() != null) {
+            CompanySettings _csC = saved.getOwner() != null
+                    ? settingsRepository.findById(saved.getOwner().getId()).orElse(null) : null;
+            String _compC = (_csC != null && _csC.getCompanyName() != null) ? _csC.getCompanyName() : "ElectroServe";
+            String _footerC = saved.getOwner() != null ? buildFooter(saved.getOwner().getId()) : "";
+            String techN = saved.getTechnician().getName();
+            String techM = saved.getTechnician().getMobile();
+            String dateC = saved.getScheduledDate() != null ? saved.getScheduledDate().toString() : "-";
+            String timeC = saved.getScheduledTime() != null ? saved.getScheduledTime() : "";
+            String whenC = timeC.isBlank() ? dateC : dateC + " " + timeC;
+            String custMsg = "Namaste " + nvl(saved.getDisplayName()) + " ji!\n\n"
+                    + "Aapka service request confirm ho gaya hai.\n\n"
+                    + "Technician: " + techN + "\n"
+                    + "Tech Mobile: " + techM + "\n"
+                    + "Schedule: " + whenC + "\n"
+                    + "Machine: " + nvl(saved.getMachineType()) + "\n\n"
+                    + "Dhanyawad!\n\n- " + _compC + _footerC;
+            custWaUrlC = "https://wa.me/91" + custMobileC + "?text="
+                    + java.net.URLEncoder.encode(custMsg, java.nio.charset.StandardCharsets.UTF_8);
+        }
         return ResponseEntity.ok(Map.of(
-                "job",          saved,
-                "whatsappMsg",  waMsg != null ? waMsg : "",
-                "whatsappUrl",  waMsg != null
-                        ? "https://wa.me/91" + saved.getTechnician().getMobile()
-                        + "?text=" + java.net.URLEncoder.encode(waMsg, java.nio.charset.StandardCharsets.UTF_8)
-                        : ""
+                "job",           saved,
+                "whatsappMsg",   waMsg != null ? waMsg : "",
+                "whatsappUrl",   custWaUrlC,
+                "techWhatsappUrl", techWaUrl
         ));
     }
 
@@ -219,13 +247,24 @@ public class JobController {
                         + (saved.getMachineBrand()!=null ? " - "+saved.getMachineBrand() : "") + "\n\n"
                         + "Koi problem ho toh humse directly contact karein.\n"
                         + "Dhanyawad! 🙏\n\n"
-                        + "— " + _compName + _footer;
+                        + "- " + _compName + _footer;
                 String waUrl = custMobile != null && !custMobile.isBlank()
                         ? "https://wa.me/91" + custMobile + "?text=" + java.net.URLEncoder.encode(waMsg, java.nio.charset.StandardCharsets.UTF_8)
                         : null;
                 // Push real-time notification to newly assigned technician
                 pushJobNotification(saved);
-                return ResponseEntity.ok(Map.of("job", saved, "whatsappUrl", waUrl != null ? waUrl : ""));
+                // Tech WA URL for reassign
+                String techWaUrlR = "";
+                if (saved.getTechnician() != null) {
+                    String techWaMsgR = buildWhatsAppMsg(saved);
+                    techWaUrlR = "https://wa.me/91" + saved.getTechnician().getMobile()
+                            + "?text=" + java.net.URLEncoder.encode(techWaMsgR, java.nio.charset.StandardCharsets.UTF_8);
+                }
+                return ResponseEntity.ok(Map.of(
+                        "job", saved,
+                        "whatsappUrl", waUrl != null ? waUrl : "",
+                        "techWhatsappUrl", techWaUrlR
+                ));
             }
             return ResponseEntity.ok(saved);
         }).orElse(ResponseEntity.notFound().build());
@@ -235,7 +274,7 @@ public class JobController {
     /**
      * PUT /jobs/{id}/complete
      * Technician yeh call karta hai job complete karne ke baad.
-     * Customer ka serial, serviceDate, warranty, kya kaam kiya — sab save hota hai.
+     * Customer ka serial, serviceDate, warranty, kya kaam kiya - sab save hota hai.
      */
     @PutMapping("/{id}/complete")
     public ResponseEntity<?> completeJob(@PathVariable Long id,
@@ -284,7 +323,7 @@ public class JobController {
                 customer.setServiceStatus("DONE");
                 customerRepository.save(customer);
             } else {
-                // job created without customer link — use inline fields
+                // job created without customer link - use inline fields
                 customerMobile = job.getCustomerMobile();
                 customerName   = job.getCustomerName();
             }
@@ -309,7 +348,7 @@ public class JobController {
                         + (cr.getWarrantyPeriod() != null && !"No Warranty".equals(cr.getWarrantyPeriod()) ? "🛡️ Warranty: " + cr.getWarrantyPeriod() + "\n" : "")
                         + "\nKoi bhi problem ho toh call karein.\n"
                         + "Dhanyawad! 🙏\n\n"
-                        + "— " + techName + ", " + _cmpName2 + _footer2;
+                        + "- " + techName + ", " + _cmpName2 + _footer2;
                 waUrl = "https://wa.me/91" + customerMobile
                         + "?text=" + java.net.URLEncoder.encode(msg, java.nio.charset.StandardCharsets.UTF_8);
             }
@@ -348,7 +387,7 @@ public class JobController {
         data.put("scheduledTime", job.getScheduledTime() != null ? job.getScheduledTime() : "");
         TechStatusSSEController.pushJobToTech(techId, data);
 
-        // FCM push notification — app band ho toh bhi aayega
+        // FCM push notification - app band ho toh bhi aayega
         User tech = job.getTechnician();
         if (tech.getFcmToken() != null && !tech.getFcmToken().isEmpty()) {
             String title = "EMERGENCY".equals(job.getPriority())
@@ -408,7 +447,7 @@ public class JobController {
                 + "\nMachine: "  + nvl(job.getMachineType())
                 + (job.getMachineBrand() != null ? " - " + job.getMachineBrand() : "")
                 + (job.getNotes() != null && !job.getNotes().isBlank() ? "\nNote: " + job.getNotes() : "")
-                + "\n\n— " + compName + footer;
+                + "\n\n- " + compName + footer;
     }
     private String nvl(String s) { return s != null ? s : "-"; }
 
