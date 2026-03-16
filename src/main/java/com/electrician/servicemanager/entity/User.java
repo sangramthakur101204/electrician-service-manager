@@ -33,6 +33,8 @@ public class User {
 
     private Boolean isActive = false;  // Tech khud Active button dabaye tab hi true hoga
 
+    private Boolean isBlocked = false;  // Owner blocked by admin (non-payment)
+
     // Jab tech Active karta hai tab ka timestamp — owner page pe duration calculate karne ke liye
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime activeStartedAt;

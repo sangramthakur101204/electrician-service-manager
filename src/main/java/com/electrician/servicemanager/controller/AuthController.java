@@ -69,6 +69,19 @@ public class AuthController {
                     .body(Map.of("error", "Password galat hai"));
         }
 
+        // Check if owner account is blocked
+        if ("OWNER".equals(user.getRole()) && Boolean.TRUE.equals(user.getIsBlocked())) {
+            return ResponseEntity.status(403).body(Map.of("error", "Account suspended. Please contact support."));
+        }
+        // Check if technician's owner is blocked
+        if ("TECHNICIAN".equals(user.getRole()) && user.getOwnerId() != null) {
+            boolean ownerBlocked = userRepository.findById(user.getOwnerId())
+                    .map(o -> Boolean.TRUE.equals(o.getIsBlocked())).orElse(false);
+            if (ownerBlocked) {
+                return ResponseEntity.status(403).body(Map.of("error", "Service suspended. Please contact your administrator."));
+            }
+        }
+
         // Reset isActive on login — fresh start (stale state fix)
         if ("TECHNICIAN".equals(user.getRole()) && Boolean.TRUE.equals(user.getIsActive())) {
             user.setIsActive(false);
