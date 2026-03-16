@@ -8,4 +8,8 @@ public interface RateCardRepository extends JpaRepository<RateCard, Long> {
     List<RateCard> findByCategory(String category);
     List<RateCard> findByIsActiveTrue();
     List<RateCard> findByCategoryAndIsActiveTrue(String category);
+
+    // Owner-specific rate cards
+    List<RateCard> findByOwnerIdAndIsActiveTrue(Long ownerId);
+    List<RateCard> findByOwnerIdIsNullAndIsActiveTrue();
 }

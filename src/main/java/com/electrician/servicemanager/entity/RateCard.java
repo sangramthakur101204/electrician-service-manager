@@ -31,4 +31,6 @@ public class RateCard {
     private String unit;            // "per visit", "per piece", etc.
 
     private Boolean isActive = true;
+
+    private Long ownerId;  // Which owner this rate card belongs to (null = global)
 }

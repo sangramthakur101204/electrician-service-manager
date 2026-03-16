@@ -38,11 +38,11 @@ public class InvoicePdfService {
     }
 
     // ── Business Info ─────────────────────────────────────────────
-    private static final String BUSINESS_NAME    = "MATOSHREE ENTERPRISES";
-    private static final String BUSINESS_OWNER   = "Rushikesh Rajput";
-    private static final String BUSINESS_PHONE   = "+91 9172730502 / 9834796734";
-    private static final String BUSINESS_EMAIL   = "rushirajput941@gmail.com";
-    private static final String BUSINESS_TAGLINE = "Washing Machine | Microwave | Water Purifier | Refrigerator";
+    private static final String BUSINESS_NAME    = "MY COMPANY";
+    private static final String BNAME   = "";
+    private static final String BUSINESS_PHONE   = "";
+    private static final String BUSINESS_EMAIL   = "";
+    private static final String BUSINESS_TAGLINE = "";
 
     // ── Brand Colors ──────────────────────────────────────────────
     private static final DeviceRgb PRIMARY     = new DeviceRgb(30, 64, 175);   // Deep blue
@@ -56,17 +56,32 @@ public class InvoicePdfService {
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("dd MMM yyyy");
 
     public byte[] generateInvoicePdf(Invoice invoice) throws IOException {
-        // Fetch owner's signature via customer → owner chain
+        // Fetch company settings dynamically
         String signatureBase64 = null;
+        String bizName    = "";
+        String bizPhone   = "";
+        String bizEmail   = "";
+        String bizTagline = "";
+        String bizAddress = "";
         try {
             Long ownerId = invoice.getCustomer() != null && invoice.getCustomer().getOwner() != null
                     ? invoice.getCustomer().getOwner().getId() : null;
             if (ownerId != null) {
-                signatureBase64 = settingsRepo.findById(ownerId)
-                        .map(CompanySettings::getSignatureBase64)
-                        .orElse(null);
+                com.electrician.servicemanager.entity.CompanySettings cs =
+                        settingsRepo.findById(ownerId).orElse(null);
+                if (cs != null) {
+                    if (cs.getCompanyName()    != null && !cs.getCompanyName().isBlank())    bizName    = cs.getCompanyName().toUpperCase();
+                    if (cs.getCompanyPhone()   != null && !cs.getCompanyPhone().isBlank())   bizPhone   = cs.getCompanyPhone();
+                    if (cs.getCompanyPhone2()  != null && !cs.getCompanyPhone2().isBlank())  bizPhone  += " / " + cs.getCompanyPhone2();
+                    if (cs.getCompanyEmail()   != null && !cs.getCompanyEmail().isBlank())   bizEmail   = cs.getCompanyEmail();
+                    if (cs.getTagline()        != null && !cs.getTagline().isBlank())        bizTagline = cs.getTagline();
+                    if (cs.getCompanyAddress() != null && !cs.getCompanyAddress().isBlank()) bizAddress = cs.getCompanyAddress();
+                    signatureBase64 = cs.getSignatureBase64();
+                }
             }
         } catch (Exception ignored) {}
+        // Use local variables for dynamic values
+        final String BNAME = bizName, BPHONE = bizPhone, BEMAIL = bizEmail, BTAGLINE = bizTagline, BADDRESS = bizAddress;
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         PdfWriter writer = new PdfWriter(baos);
         PdfDocument pdf = new PdfDocument(writer);
@@ -89,13 +104,13 @@ public class InvoicePdfService {
                 .setBorder(Border.NO_BORDER)
                 .setPadding(0);
 
-        leftCell.add(new Paragraph(BUSINESS_NAME)
+        leftCell.add(new Paragraph(BNAME)
                 .setFont(bold).setFontSize(18).setFontColor(PRIMARY)
                 .setMarginBottom(2));
-        leftCell.add(new Paragraph(BUSINESS_TAGLINE)
+        leftCell.add(new Paragraph(BTAGLINE)
                 .setFont(regular).setFontSize(9).setFontColor(TEXT_GRAY)
                 .setMarginBottom(4));
-        leftCell.add(new Paragraph("Ph: " + BUSINESS_PHONE + "   ✉ " + BUSINESS_EMAIL)
+        leftCell.add(new Paragraph("Ph: " + BPHONE + "   ✉ " + BEMAIL)
                 .setFont(regular).setFontSize(9).setFontColor(TEXT_DARK));
 
         // Right: Invoice Badge
@@ -285,9 +300,9 @@ public class InvoicePdfService {
                 .setWidth(UnitValue.createPercentValue(100));
 
         Cell fLeft = new Cell().setBorder(Border.NO_BORDER);
-        fLeft.add(new Paragraph("Thank you for choosing " + BUSINESS_NAME + "!")
+        fLeft.add(new Paragraph("Thank you for choosing " + BNAME + "!")
                 .setFont(bold).setFontSize(9).setFontColor(PRIMARY));
-        fLeft.add(new Paragraph("For any queries: " + BUSINESS_PHONE + " | " + BUSINESS_EMAIL)
+        fLeft.add(new Paragraph("For any queries: " + BPHONE + " | " + BEMAIL)
                 .setFont(regular).setFontSize(8).setFontColor(TEXT_GRAY));
 
         Cell fRight = new Cell().setBorder(Border.NO_BORDER).setTextAlignment(TextAlignment.RIGHT);
@@ -311,7 +326,7 @@ public class InvoicePdfService {
         }
         fRight.add(new Paragraph("Authorised Signature")
                 .setFont(regular).setFontSize(8).setFontColor(TEXT_GRAY));
-        fRight.add(new Paragraph(BUSINESS_NAME)
+        fRight.add(new Paragraph(BNAME)
                 .setFont(bold).setFontSize(8).setFontColor(TEXT_DARK));
 
         footer.addCell(fLeft);

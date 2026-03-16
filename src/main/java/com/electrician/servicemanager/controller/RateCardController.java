@@ -15,8 +15,12 @@ public class RateCardController {
 
     private final RateCardRepository rateCardRepository;
 
-    public RateCardController(RateCardRepository rateCardRepository) {
+    private final com.electrician.servicemanager.repository.UserRepository userRepository;
+
+    public RateCardController(RateCardRepository rateCardRepository,
+                              com.electrician.servicemanager.repository.UserRepository userRepository) {
         this.rateCardRepository = rateCardRepository;
+        this.userRepository     = userRepository;
     }
 
     @PostConstruct
@@ -218,8 +222,24 @@ public class RateCardController {
     }
 
     @GetMapping("/active")
-    public ResponseEntity<List<RateCard>> getActive() {
-        return ResponseEntity.ok(rateCardRepository.findByIsActiveTrue());
+    public ResponseEntity<List<RateCard>> getActive(jakarta.servlet.http.HttpServletRequest req) {
+        com.electrician.servicemanager.entity.User user =
+                (com.electrician.servicemanager.entity.User) req.getAttribute("currentUser");
+        if (user == null) return ResponseEntity.ok(rateCardRepository.findByIsActiveTrue());
+
+        Long ownerId = "OWNER".equals(user.getRole()) ? user.getId() : user.getOwnerId();
+
+        // Return owner's cards + global cards (ownerId = null)
+        java.util.List<RateCard> ownerCards = ownerId != null
+                ? rateCardRepository.findByOwnerIdAndIsActiveTrue(ownerId)
+                : new java.util.ArrayList<>();
+        java.util.List<RateCard> globalCards = rateCardRepository.findByOwnerIdIsNullAndIsActiveTrue();
+
+        java.util.List<RateCard> all = new java.util.ArrayList<>();
+        all.addAll(ownerCards);
+        // Add global cards only if owner has no cards
+        if (ownerCards.isEmpty()) all.addAll(globalCards);
+        return ResponseEntity.ok(all);
     }
 
     @GetMapping("/category/{category}")
