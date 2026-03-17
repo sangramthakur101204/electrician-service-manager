@@ -236,9 +236,15 @@ public class RateCardController {
         java.util.List<RateCard> globalCards = rateCardRepository.findByOwnerIdIsNullAndIsActiveTrue();
 
         java.util.List<RateCard> all = new java.util.ArrayList<>();
-        all.addAll(ownerCards);
-        // Add global cards only if owner has no cards
-        if (ownerCards.isEmpty()) all.addAll(globalCards);
+        // Always show global cards + owner-specific cards
+        all.addAll(globalCards);
+        // Add owner cards on top (override globals)
+        ownerCards.forEach(oc -> {
+            // Remove global card with same name if owner has custom one
+            all.removeIf(gc -> gc.getCategory().equals(oc.getCategory())
+                    && gc.getServiceName().equals(oc.getServiceName()));
+            all.add(oc);
+        });
         return ResponseEntity.ok(all);
     }
 
