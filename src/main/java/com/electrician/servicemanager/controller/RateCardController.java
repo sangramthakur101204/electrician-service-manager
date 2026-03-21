@@ -227,24 +227,34 @@ public class RateCardController {
                 (com.electrician.servicemanager.entity.User) req.getAttribute("currentUser");
         if (user == null) return ResponseEntity.ok(rateCardRepository.findByIsActiveTrue());
 
-        Long ownerId = "OWNER".equals(user.getRole()) ? user.getId() : user.getOwnerId();
+        // Owner: use own ID. Technician: use ownerId field
+        Long ownerId = null;
+        if ("OWNER".equals(user.getRole())) {
+            ownerId = user.getId();
+        } else if ("TECHNICIAN".equals(user.getRole())) {
+            ownerId = user.getOwnerId();
+        }
 
-        // Return owner's cards + global cards (ownerId = null)
+        System.out.println("[RateCards] user=" + user.getName() + " role=" + user.getRole() + " ownerId=" + ownerId);
+
+        // If ownerId found — return owner cards (if any) else global cards
         java.util.List<RateCard> ownerCards = ownerId != null
                 ? rateCardRepository.findByOwnerIdAndIsActiveTrue(ownerId)
                 : new java.util.ArrayList<>();
+
+        System.out.println("[RateCards] ownerCards count=" + ownerCards.size());
+
         java.util.List<RateCard> globalCards = rateCardRepository.findByOwnerIdIsNullAndIsActiveTrue();
 
         java.util.List<RateCard> all = new java.util.ArrayList<>();
-        // Always show global cards + owner-specific cards
-        all.addAll(globalCards);
-        // Add owner cards on top (override globals)
-        ownerCards.forEach(oc -> {
-            // Remove global card with same name if owner has custom one
-            all.removeIf(gc -> gc.getCategory().equals(oc.getCategory())
-                    && gc.getServiceName().equals(oc.getServiceName()));
-            all.add(oc);
-        });
+        if (!ownerCards.isEmpty()) {
+            // Owner has custom cards — show only owner cards
+            all.addAll(ownerCards);
+        } else {
+            // No owner cards — show global cards
+            all.addAll(globalCards);
+        }
+        System.out.println("[RateCards] returning " + all.size() + " cards");
         return ResponseEntity.ok(all);
     }
 
