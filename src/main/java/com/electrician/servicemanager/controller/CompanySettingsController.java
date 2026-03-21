@@ -60,13 +60,18 @@ public class CompanySettingsController {
     private void syncRateCards(Long ownerId, String rateCardJson) {
         if (rateCardJson == null || rateCardJson.isBlank()) return;
         try {
+            System.out.println("[RateCard] Syncing for ownerId=" + ownerId + " json length=" + rateCardJson.length());
             com.fasterxml.jackson.databind.ObjectMapper om = new com.fasterxml.jackson.databind.ObjectMapper();
             java.util.Map<String, java.util.List<String>> map = om.readValue(rateCardJson,
                     new com.fasterxml.jackson.core.type.TypeReference<java.util.Map<String, java.util.List<String>>>(){});
+            System.out.println("[RateCard] Parsed categories: " + map.keySet());
 
-            // Delete existing owner rate cards
+            // Delete ALL cards for this owner (active or not)
             java.util.List<com.electrician.servicemanager.entity.RateCard> existing =
-                    rateCardRepository.findByOwnerIdAndIsActiveTrue(ownerId);
+                    rateCardRepository.findAll().stream()
+                            .filter(r -> ownerId.equals(r.getOwnerId()))
+                            .collect(java.util.stream.Collectors.toList());
+            System.out.println("[RateCard] Deleting " + existing.size() + " old cards");
             rateCardRepository.deleteAll(existing);
 
             // Insert new ones
