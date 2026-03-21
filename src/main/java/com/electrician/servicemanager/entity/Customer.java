@@ -55,6 +55,9 @@ public class Customer {
     @Column(length = 500)
     private String notes;            // Extra remarks
 
+    // ── Birthday ─────────────────────────────────────
+    private LocalDate dateOfBirth;   // Customer ka birthday (optional)
+
     // ── Owner link (multi-tenant support) ─────────────
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id")

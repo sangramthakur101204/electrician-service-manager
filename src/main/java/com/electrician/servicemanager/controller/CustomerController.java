@@ -302,6 +302,22 @@ public class CustomerController {
         );
     }
 
+    // ── Birthday today ────────────────────────────────────────────────────────
+    @GetMapping("/birthdays/today")
+    public ResponseEntity<List<Customer>> getTodayBirthdays(HttpServletRequest req) {
+        User owner = (User) req.getAttribute("currentUser");
+        java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Kolkata"));
+        int todayMonth = today.getMonthValue();
+        int todayDay   = today.getDayOfMonth();
+        List<Customer> all = customerRepository.findCustomersByOwner(owner.getId());
+        List<Customer> birthdays = all.stream()
+                .filter(cu -> cu.getDateOfBirth() != null
+                        && cu.getDateOfBirth().getMonthValue() == todayMonth
+                        && cu.getDateOfBirth().getDayOfMonth() == todayDay)
+                .collect(java.util.stream.Collectors.toList());
+        return ResponseEntity.ok(birthdays);
+    }
+
     @GetMapping("/search")
     public ResponseEntity<List<Customer>> search(
             @RequestParam(required = false) String name,

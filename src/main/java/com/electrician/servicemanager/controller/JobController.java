@@ -118,6 +118,10 @@ public class JobController {
             c.setName(req2.getCustomerName().trim());
             c.setMobile(req2.getCustomerMobile().trim());
             c.setAddress(req2.getCustomerAddress());
+            if (req2.getCustomerDob() != null && !req2.getCustomerDob().isBlank()) {
+                try { c.setDateOfBirth(java.time.LocalDate.parse(req2.getCustomerDob())); }
+                catch(Exception ignored) {}
+            }
             c.setLatitude(req2.getLatitude());
             c.setLongitude(req2.getLongitude());
             c.setMachineType(req2.getMachineType());
@@ -455,6 +459,7 @@ public class JobController {
     public static class JobRequest {
         private Long   customerId;
         private String customerName, customerMobile, customerAddress;
+        private String customerDob;
         private Double latitude, longitude;
         private String problemDescription, machineType, machineBrand;
         private String priority, status, scheduledDate, scheduledTime, notes;
@@ -463,6 +468,8 @@ public class JobController {
 
         public Long   getCustomerId()              { return customerId; }
         public void   setCustomerId(Long v)        { customerId = v; }
+        public String getCustomerDob()             { return customerDob; }
+        public void   setCustomerDob(String v)     { customerDob = v; }
         public String getCustomerName()            { return customerName; }
         public void   setCustomerName(String v)    { customerName = v; }
         public String getCustomerMobile()          { return customerMobile; }
