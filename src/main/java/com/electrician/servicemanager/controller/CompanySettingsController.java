@@ -76,18 +76,27 @@ public class CompanySettingsController {
 
             // Insert new ones
             java.util.List<com.electrician.servicemanager.entity.RateCard> newCards = new java.util.ArrayList<>();
+            System.out.println("[RateCard] Building cards from " + map.size() + " categories");
             map.forEach((category, services) -> {
                 if (services != null) services.forEach(svc -> {
                     // Parse "Service Name: ₹1500" format
-                    String name = svc;
+                    String name = svc.trim();
                     Double price = 0.0;
+                    // Find last colon followed by optional spaces and ₹ or number
                     int idx = svc.lastIndexOf(":");
                     if (idx > 0) {
                         name = svc.substring(0, idx).trim();
-                        String priceStr = svc.substring(idx+1).trim()
-                                .replace("₹","").replace(",","").trim();
-                        try { price = Double.parseDouble(priceStr); } catch(Exception e) {}
+                        String priceStr = svc.substring(idx+1).trim();
+                        // Remove all non-numeric except dot
+                        priceStr = priceStr.replaceAll("[^0-9.]", "").trim();
+                        if (!priceStr.isEmpty()) {
+                            try { price = Double.parseDouble(priceStr); } catch(Exception e) {
+                                System.out.println("[RateCard] Price parse failed for: " + svc);
+                            }
+                        }
                     }
+                    if (name.isEmpty()) name = svc.trim();
+                    System.out.println("[RateCard] Adding: " + category + " / " + name + " = " + price);
                     com.electrician.servicemanager.entity.RateCard rc = new com.electrician.servicemanager.entity.RateCard();
                     rc.setCategory(category);
                     rc.setServiceName(name);
@@ -99,6 +108,7 @@ public class CompanySettingsController {
                 });
             });
             rateCardRepository.saveAll(newCards);
+            System.out.println("[RateCard] Saved " + newCards.size() + " new cards for ownerId=" + ownerId);
         } catch(Exception e) {
             System.err.println("[Settings] Rate card sync failed: " + e.getMessage());
         }
