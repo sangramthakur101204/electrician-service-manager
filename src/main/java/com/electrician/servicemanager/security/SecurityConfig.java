@@ -33,7 +33,15 @@ public class SecurityConfig {
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         // Public endpoints
-                        .requestMatchers("/auth/**", "/health", "/admin/**").permitAll()
+
+                        .requestMatchers(
+                                "/auth/**",
+                                "/health",
+                                "/admin/**",
+                                "/customer-portal/config",
+                                "/customer-portal/bookings"
+                        ).permitAll()
+
                         // Baaki sab ke liye token chahiye
                         .anyRequest().authenticated()
                 )
